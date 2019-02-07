@@ -1,5 +1,5 @@
-#LyX 2.0 created this file. For more info see http://www.lyx.org/
-\lyxformat 413
+#LyX 2.1 created this file. For more info see http://www.lyx.org/
+\lyxformat 474
 \begin_document
 \begin_header
 \textclass article
@@ -23,13 +23,13 @@ knitr
 \font_roman palatino
 \font_sans lmss
 \font_typewriter lmtt
+\font_math auto
 \font_default_family default
 \use_non_tex_fonts false
 \font_sc true
 \font_osf false
 \font_sf_scale 100
 \font_tt_scale 100
-
 \graphics default
 \default_output_format default
 \output_sync 0
@@ -50,15 +50,24 @@ knitr
 \pdf_quoted_options "pdfstartview={XYZ null null 1}"
 \papersize default
 \use_geometry true
-\use_amsmath 1
-\use_esint 1
-\use_mhchem 1
-\use_mathdots 1
-\cite_engine natbib_authoryear
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine natbib
+\cite_engine_type authoryear
+\biblio_style plainnat
 \use_bibtopic false
 \use_indices false
 \paperorientation portrait
 \suppress_date false
+\justification true
 \use_refstyle 1
 \index Index
 \shortcut idx
@@ -122,7 +131,7 @@ options(formatR.arrow=TRUE, width=68, digits=4)
 
 \begin_layout Plain Layout
 
-## tune details of base graphics (http://yihui.name/knitr/hooks)
+## tune details of base graphics (https://yihui.name/knitr/hooks)
 \end_layout
 
 \begin_layout Plain Layout
@@ -209,7 +218,7 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://yihui.name/knitr/
+https://yihui.name/knitr/
 \end_layout
 
 \end_inset
@@ -323,7 +332,7 @@ qplot(speed, dist, data=cars)+geom_smooth()
 \end_layout
 
 \begin_layout Plain Layout
-\begin_inset Caption
+\begin_inset Caption Standard
 
 \begin_layout Plain Layout
 \begin_inset CommandInset label
@@ -424,7 +433,7 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://yihui.name/knitr/demo/sweave/
+https://yihui.name/knitr/demo/sweave/
 \end_layout
 
 \end_inset
@@ -458,7 +467,7 @@ knitr
 \begin_inset CommandInset href
 LatexCommand href
 name "patterns"
-target "http://yihui.name/knitr/patterns"
+target "https://yihui.name/knitr/patterns"
 
 \end_inset
 
@@ -479,7 +488,7 @@ a set of output
 \begin_inset CommandInset href
 LatexCommand href
 name "hooks"
-target "http://yihui.name/knitr/hooks"
+target "https://yihui.name/knitr/hooks"
 
 \end_inset
 
@@ -535,7 +544,7 @@ dependson
 \begin_inset CommandInset href
 LatexCommand href
 name "option"
-target "http://yihui.name/knitr/options"
+target "https://yihui.name/knitr/options"
 
 \end_inset
 
@@ -800,7 +809,7 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://yihui.name/knitr/demos
+https://yihui.name/knitr/demos
 \end_layout
 
 \end_inset
@@ -1826,7 +1835,7 @@ The graphics manual contains more detailed information and you can check
 \begin_inset CommandInset href
 LatexCommand href
 name "website"
-target "http://yihui.name/knitr/demo/graphics/"
+target "https://yihui.name/knitr/demo/graphics/"
 
 \end_inset
 
@@ -2123,7 +2132,7 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://yihui.name/knitr/demo/cache/
+https://yihui.name/knitr/demo/cache/
 \end_layout
 
 \end_inset
@@ -2340,7 +2349,7 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://yihui.name/knitr/demo/sweave/
+https://yihui.name/knitr/demo/sweave/
 \end_layout
 
 \end_inset
@@ -2599,7 +2608,7 @@ hook_rgl()
 \emph default
  in 
 \series bold
-knitr
+rgl
 \series default
 :
 \end_layout
@@ -2611,6 +2620,11 @@ status open
 \begin_layout Plain Layout
 
 <<rgl-demo>>=
+\end_layout
+
+\begin_layout Plain Layout
+
+library(rgl)
 \end_layout
 
 \begin_layout Plain Layout
@@ -2698,7 +2712,7 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://yihui.name/knitr/demos
+https://yihui.name/knitr/demos
 \end_layout
 
 \end_inset
@@ -2756,7 +2770,7 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://yihui.name/knitr/demo/rstudio/
+https://yihui.name/knitr/demo/rstudio/
 \end_layout
 
 \end_inset
@@ -2767,7 +2781,7 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://yihui.name/knitr/demo/lyx/
+https://yihui.name/knitr/demo/lyx/
 \end_layout
 
 \end_inset
@@ -2777,7 +2791,7 @@ http://yihui.name/knitr/demo/lyx/
 \begin_inset CommandInset href
 LatexCommand href
 name "Eclipse"
-target "http://yihui.name/knitr/demo/eclipse/"
+target "https://yihui.name/knitr/demo/eclipse/"
 
 \end_inset
 
@@ -2785,7 +2799,7 @@ target "http://yihui.name/knitr/demo/eclipse/"
 \begin_inset CommandInset href
 LatexCommand href
 name "Texmaker and WinEdt"
-target "http://yihui.name/knitr/demo/editors/"
+target "https://yihui.name/knitr/demo/editors/"
 
 \end_inset
 

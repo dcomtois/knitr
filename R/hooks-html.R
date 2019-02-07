@@ -7,7 +7,7 @@ hook_plot_html = function(x, options) {
 
   if (options$fig.show == 'animate') {
     # Don't print out intermediate plots if we're animating
-    return(if (fig.cur < fig.num) '' else opts_knit$get('animation.fun')(x, options))
+    return(if (fig.cur < fig.num) '' else hook_animation(options)(x, options))
   }
   ai = options$fig.show == 'asis'
   plot1 = ai || fig.cur <= 1L; plot2 = ai || fig.cur == fig.num
@@ -22,24 +22,46 @@ hook_plot_html = function(x, options) {
   )
 }
 
+hook_animation = function(options) {
+  if (is.function(fun <- options$animation.hook)) return(fun)
+  if (is.character(fun)) return(switch(
+    fun, ffmpeg = hook_ffmpeg_html, gifski = hook_gifski,
+    scianimator = hook_scianimator, r2swf = hook_r2swf,
+    stop2('Invalid value for the chunk option animation.hook: ', fun)
+  ))
+  if (is.function(fun <- opts_knit$get('animation.fun'))) return(fun)
+  hook_ffmpeg_html
+}
+
 .img.attr = function(w, h, extra) {
   paste(c(sprintf('width="%s"', w), sprintf('height="%s"', h), extra), collapse = ' ')
 }
 
 .img.tag = function(src, w, h, caption, extra) {
+  caption = if (length(caption) == 1 && caption != '') {
+    paste0('title="', caption, '" alt="', caption, '" ')
+  }
+  tag = if (grepl('[.]pdf$', src, ignore.case = TRUE)) {
+    extra = c(extra, 'type="application/pdf"')
+    'embed'
+  } else 'img'
   paste0(
-    '<img src="', opts_knit$get('base.url'), src, '" title="', caption,
-    '" alt="', caption, '" ', .img.attr(w, h, extra), ' />'
+    '<', tag, ' src="', opts_knit$get('base.url'), src, '" ', caption,
+    .img.attr(w, h, extra), ' />'
   )
 }
 
-.img.cap = function(options) {
+.img.cap = function(options, alt = FALSE) {
   cap = options$fig.cap %n% {
     if (is.null(pandoc_to())) sprintf('plot of chunk %s', options$label) else ''
   }
   if (length(cap) == 0) cap = ''
-  if (cap == '') return(cap)
-  paste0(create_label(options$fig.lp, options$label), cap)
+  if (is_blank(cap)) return(cap)
+  if (alt) return(escape_html(cap))
+  paste0(create_label(
+    options$fig.lp, options$label,
+    if (options$fig.num > 1L && options$fig.show == 'asis') options$fig.cur
+  ), cap)
 }
 
 # a wrapper to upload an image and return the URL
@@ -64,8 +86,9 @@ hook_plot_html = function(x, options) {
 #' Hooks to create animations in HTML output
 #'
 #' \code{hook_ffmpeg_html()} uses FFmpeg to convert images to a video;
-#' \code{hook_scianimator()} uses the JavaScript library SciAnimator to create
-#' animations; \code{hook_r2swf()} uses the \pkg{R2SWF} package.
+#' \code{hook_gifski()} uses the \pkg{gifski} to convert images to a GIF
+#' animation; \code{hook_scianimator()} uses the JavaScript library SciAnimator
+#' to create animations; \code{hook_r2swf()} uses the \pkg{R2SWF} package.
 #'
 #' These hooks are mainly for the package option \code{animation.fun}, e.g. you
 #' can set \code{opts_knit$set(animation.fun = hook_scianimator)}.
@@ -81,18 +104,31 @@ hook_ffmpeg = function(x, options, format = 'webm') {
   fig.num = options$fig.num
   format = sub('^[.]', '', format)
   # set up the ffmpeg run
-  fig.fname = paste0(sub(paste0(fig.num, '$'), '%d', x[1]), '.', x[2])
-  mov.fname = paste0(sub(paste0(fig.num, '$'), '', x[1]), '.', format)
+  base = sub(paste0(fig.num, '$'), '', x[1])
+  fig.fname = paste0(base, '%d', '.', x[2])
+  mov.fname = paste0(sub('-$', '', base), '.', format)
 
-  extra = if (format == 'webm') {
-    paste('-b:v', options$ffmpeg.bitrate %n% '1M', '-crf 10')
-  }
+  extra = switch(
+    format,
+    webm = paste('-b:v', options$ffmpeg.bitrate %n% '1M', '-crf 10'),
+    mp4  = '-pix_fmt yuv420p'  # enables Safari support of .mp4
+  )
   ffmpeg.cmd = paste(
     'ffmpeg', '-y', '-r', 1 / options$interval, '-i', fig.fname, extra, mov.fname
   )
 
+  if (Sys.which('ffmpeg') == '') stop2(
+    'Could not find ffmpeg command. You should either change the animation.fun ',
+    'hook option or install ffmpeg with libvpx enabled.'
+  )
   message('executing: ', ffmpeg.cmd)
   system(ffmpeg.cmd, ignore.stdout = TRUE)
+
+  # use a normal plot hook if the output is GIF
+  if (format == 'gif') {
+    options$fig.show = 'hold'
+    return((if (out_format('markdown')) hook_plot_md else hook_plot_html)(mov.fname, options))
+  }
 
   # controls,loop --> controls loop
   opts = paste(sc_split(options$aniopts), collapse = ' ')
@@ -100,9 +136,38 @@ hook_ffmpeg = function(x, options, format = 'webm') {
     sprintf('width="%s"', options$out.width),
     sprintf('height="%s"', options$out.height), opts
   )
-  sprintf('<video %s><source src="%s" /><p>video of chunk %s</p></video>',
-          opts, paste0(opts_knit$get('base.url'), mov.fname), options$label)
+  cap = .img.cap(options, alt = TRUE)
+  if (cap != '') cap = sprintf('<p>%s</p>', cap)
+  sprintf(
+    '<video %s><source src="%s" />%s</video>', trimws(opts),
+    paste0(opts_knit$get('base.url'), mov.fname), cap
+  )
 }
+
+# use gifski to create gif's
+#' @rdname hook_animation
+#' @export
+hook_gifski = function(x, options) {
+  x = c(sans_ext(x), file_ext(x))
+  if (tolower(x[2]) != 'png') stop(
+    "To use hook_gifski(), the code chunk must generate 'png' images instead of '", x[2], "'."
+  )
+  fig.num = options$fig.num
+  base = sub(paste0(fig.num, '$'), '', x[1])
+  frames = paste0(base, format(seq_len(fig.num), trim = TRUE), '.', x[2])
+  gif = paste0(base, '.gif')
+  dpi = options$dpi
+  gifski::gifski(
+    frames, gif, width = options$fig.width * dpi, height = options$fig.height * dpi,
+    delay = options$interval, loop = isTRUE(grepl('\\bloop\\b', options$aniopts)),
+    progress = opts_knit$get('progress')
+  )
+  unlink(frames)
+  # pretend it is a single image (gif) generated from the code chunk
+  options$fig.show = 'asis'; options$fig.cur = 1; options$fig.num = 1
+  knit_hooks$get('plot')(gif, options)
+}
+
 
 # use SciAnimator to create animations
 #' @rdname hook_animation

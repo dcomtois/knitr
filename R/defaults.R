@@ -11,18 +11,28 @@ new_defaults = function(value = list()) {
       }
     }
   }
-  set = function(...) {
+  resolve = function(...) {
     dots = list(...)
     if (length(dots) == 0) return()
     if (is.null(names(dots)) && length(dots) == 1 && is.list(dots[[1]]))
       if (length(dots <- dots[[1]]) == 0) return()
-    defaults <<- merge(dots)
+    dots
+  }
+  set = function(...) {
+    dots = resolve(...)
+    if (length(dots)) defaults <<- merge(dots)
     invisible(NULL)
   }
   merge = function(values) merge_list(defaults, values)
   restore = function(target = value) defaults <<- target
+  append = function(...) {
+    dots = resolve(...)
+    for (i in names(dots)) dots[[i]] <- c(defaults[[i]], dots[[i]])
+    if (length(dots)) defaults <<- merge(dots)
+    invisible(NULL)
+  }
 
-  list(get = get, set = set, merge = merge, restore = restore)
+  list(get = get, set = set, append = append, merge = merge, restore = restore)
 }
 
 #' Default and current chunk options
@@ -39,14 +49,14 @@ new_defaults = function(value = list()) {
 #' the options in this chunk itself, and that is why we often need to set global
 #' options in a separate chunk.
 #'
-#' Below is a list of default chunk options, retrieved via
-#' \code{opts_chunk$get()}:
-#'
-#' \Sexpr[results=verbatim]{str(knitr::opts_chunk$get())}
-#' @references Usage: \url{http://yihui.name/knitr/objects}
+#' See \code{str(knitr::opts_chunk$get())} for a list of default chunk options.
+#' @references Usage: \url{https://yihui.name/knitr/objects/}
 #'
 #'   A list of available options:
-#'   \url{http://yihui.name/knitr/options#chunk_options}
+#'   \url{https://yihui.name/knitr/options/#chunk_options}
+#' @note \code{opts_current} is read-only in the sense that it does nothing if
+#'   you call \code{opts_current$set()}; you can only query the options via
+#'   \code{opts_current$get()}.
 #' @export
 #' @examples opts_chunk$get('prompt'); opts_chunk$get('fig.keep')
 opts_chunk = new_defaults(list(
@@ -98,8 +108,10 @@ opts_chunk_attr = local({
   opts$external = opts$sanitize = NULL  # hide these two rare options
   opts$fig.process = 'function'
   opts$fig.asp = 'numeric'
+  opts$fig.dim = 'list'
   opts$R.options = 'list'
   opts$cache.comments = 'logical'
+  opts$animation.hook = list('ffmpeg', 'gifski')
   opts
 })
 
@@ -108,9 +120,9 @@ opts_chunk_attr = local({
 #' We do not have to use the chunk option names given in \pkg{knitr}; we can set
 #' aliases for them. The aliases are a named character vector; the names are
 #' aliases and the elements in this vector are the real option names.
-#' @param ... named arguments (argument names are aliases, and argument values
-#'   are real chunk options)
-#' @return NULL (\code{opts_knit$get('aliases')} is modified as the side effect)
+#' @param ... Named arguments. Argument names are aliases, and argument values
+#'   are real option names.
+#' @return \code{NULL}. \code{opts_knit$get('aliases')} is modified as the side effect.
 #' @export
 #' @examples set_alias(w = 'fig.width', h = 'fig.height')
 #' # then we can use options w and h in chunk headers instead of fig.width and fig.height
@@ -131,14 +143,11 @@ set_alias = function(...) {
 #' correspond to options in \code{opts_knit}. This can be useful to set package
 #' options in \file{~/.Rprofile} without loading \pkg{knitr}.
 #'
-#'  Below is a list of default package options, retrieved via
-#' \code{opts_knit$get()}:
-#'
-#' \Sexpr[results=verbatim]{str(knitr::opts_knit$get())}
-#' @references Usage: \url{http://yihui.name/knitr/objects}
+#' See \code{str(knitr::opts_knit$get())} for a list of default package options.
+#' @references Usage: \url{https://yihui.name/knitr/objects/}
 #'
 #'   A list of available options:
-#'   \url{http://yihui.name/knitr/options#package_options}
+#'   \url{https://yihui.name/knitr/options/#package_options}
 #' @export
 #' @examples opts_knit$get('verbose'); opts_knit$set(verbose = TRUE)  # change it
 #' if (interactive()) {
@@ -148,10 +157,9 @@ set_alias = function(...) {
 #' }
 #' @include hooks-html.R
 opts_knit = new_defaults(list(
-  progress = TRUE, verbose = FALSE, width = 75L, eval.after = NULL,
+  progress = TRUE, verbose = FALSE, width = 75L, eval.after = 'fig.cap',
   base.dir = NULL, base.url = NULL, root.dir = NULL, child.path = '',
-  upload.fun = identity, animation.fun = hook_ffmpeg_html,
-  global.device = FALSE, global.par = FALSE,
+  upload.fun = identity, global.device = FALSE, global.par = FALSE,
   concordance = FALSE, documentation = 1L, self.contained = TRUE,
   unnamed.chunk.label = 'unnamed-chunk', highr.opts = NULL,
 
@@ -187,9 +195,9 @@ adjust_opts_knit = function() {
   i = intersect(i, which(nms[i] %in% paste('knitr', opts_knit_names, sep = '.')))
   if (length(i)) {
     nms.pkg = sub('^knitr.', 'knitr.package.', nms[i])
-    warning(
+    warning2(
       'These options must be renamed (from left to right):\n',
-      formatUL(sprintf('%s => %s', nms[i], nms.pkg)), call. = FALSE, immediate. = TRUE
+      formatUL(sprintf('%s => %s', nms[i], nms.pkg)), immediate. = TRUE
     )
     Sys.sleep(10)
     names(opts)[i] = nms[i] = nms.pkg

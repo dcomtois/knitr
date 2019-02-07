@@ -1,4 +1,4 @@
-%% LyX 2.1.3 created this file.  For more info, see http://www.lyx.org/.
+%% LyX 2.2.1 created this file.  For more info, see http://www.lyx.org/.
 %% Do not edit unless you really know what you are doing.
 \documentclass[nohyper,justified]{tufte-handout}
 \usepackage[T1]{fontenc}
@@ -9,6 +9,7 @@
  {hyperref}
 \hypersetup{
  pdfstartview=FitH}
+\usepackage{breakurl}
 
 \makeatletter
 
@@ -36,7 +37,6 @@ knit_hooks$set(par=function(before, options, envir){
 if (before && options$fig.show!='none') par(mar=c(4,4,.1,.1),cex.lab=.95,cex.axis=.9,mgp=c(2,.7,0),tcl=-.3)
 }, crop=hook_pdfcrop)
 @
-
 \maketitle
 \begin{abstract}
 This manual shows features of graphics in the \textbf{knitr} package
@@ -47,7 +47,6 @@ types of plots such as \textbf{rgl} or GGobi plots.
 \end{abstract}
 Before reading this specific manual\footnote{\url{http://bit.ly/knitr-graphics-src} (Rnw source)},
 you must have finished the main manual\footnote{\url{http://bit.ly/knitr-main}}.
-
 
 \section{Graphical Devices}
 
@@ -67,17 +66,15 @@ with(trees, symbols(Height, Volume, circles = Girth/16, inches = FALSE, bg = 'de
 <<pdf-dev, ref.label='test-plot', dev='pdf', out.width='\\linewidth', echo=FALSE>>=
 @
 
-\protect\caption{The default PDF device.\label{mar:pdf-dev}}
+\caption{The default PDF device.\label{mar:pdf-dev}}
 \end{marginfigure}
-
 
 \begin{marginfigure}
 <<png-dev, ref.label='test-plot', dev='png', out.width='\\linewidth', echo=FALSE>>=
 @
 
-\protect\caption{The PNG device.\label{mar:png-dev}}
+\caption{The PNG device.\label{mar:png-dev}}
 \end{marginfigure}
-
 
 Figure \ref{mar:pdf-dev} and \ref{mar:png-dev} show two standard
 devices in the \textbf{grDevices} package. We can also use devices
@@ -86,7 +83,6 @@ below uses the \emph{CairoPNG()} device in the \textbf{Cairo} package.
 
 <<cairo-png-dev, ref.label='test-plot', dev='CairoPNG', out.width='.5\\linewidth', echo=FALSE>>=
 @
-
 
 \section{Plot Recording}
 
@@ -105,14 +101,13 @@ plot(cars)
 boxplot(cars$dist,xlab='dist')
 @
 
-\protect\caption{Two high-level plots are captured. The key to arrange two plots side
+\caption{Two high-level plots are captured. The key to arrange two plots side
 by side is to specify the \texttt{out.width} option so that each plot
 takes less than half of the line width. We do not have to use the
 \texttt{par(mfrow)} trick, and it may not work in some cases (e.g.
 to put base graphics and \textbf{ggplot2} side by side; recall Figure
 1 in the main manual).\label{fig:two-high}}
 \end{figure}
-
 
 Figure \ref{fig:low-plot-loop} shows another example of two R expressions,
 but the second expression only involves with low-level plotting changes.
@@ -125,11 +120,10 @@ plot(0,0,type='n',ann=FALSE)
 for(i in seq(0, 2*pi,length=20)) {points(cos(i),sin(i))}
 @
 
-\protect\caption{Two complete R expressions will produce at most two plots, as long
+\caption{Two complete R expressions will produce at most two plots, as long
 as there are not multiple high-level plotting calls in each expression;
 option \texttt{fig.keep='all'} here.\label{fig:low-plot-loop}}
 \end{figure}
-
 
 Together with \texttt{fig.show='asis'}, we can show the process of
 plotting step by step like Figure \ref{fig:high-with-low}.
@@ -140,10 +134,9 @@ plot(cars)
 abline(lm(dist~speed, data=cars))  # a regression line
 @
 
-\protect\caption{Low-level plot changes in base graphics can be recorded separately,
+\caption{Low-level plot changes in base graphics can be recorded separately,
 and plots can be put in the places where they were produced.\label{fig:high-with-low}}
 \end{figure}
-
 
 A further note on plot recording: \textbf{knitr} examines all recorded
 plots (as R objects) and compares them sequentially; if the previous
@@ -158,7 +151,6 @@ m = matrix(1:100, ncol = 10)
 image(m)
 image(m*2)  # exactly the same as previous plot
 @
-
 
 \section{Plot Rearrangement}
 
@@ -180,11 +172,10 @@ pie + coord_polar(theta = "y") # a pie chart
 pie + coord_polar() # the bullseye chart 
 @
 
-\protect\caption{Two plots were produced in this chunk, but only the last one is kept.
+\caption{Two plots were produced in this chunk, but only the last one is kept.
 This can be useful when we experiment with many plots, but only want
 the last result. (Adapted from the \textbf{ggplot2} website)}
 \end{figure}
-
 
 When multiple plots are produced by a code chunk, we may want to show
 them as an animation with the option \texttt{fig.show='animate'}.
@@ -204,10 +195,9 @@ for (i in seq(pi/2, -4/3 * pi, length = 12)) {
 }
 @
 
-\protect\caption{A clock animation. You have to view it in Adobe Reader: click to play/pause;
+\caption{A clock animation. You have to view it in Adobe Reader: click to play/pause;
 there are also buttons to speed up or slow down the animation.\label{fig:clock-animation}}
 \end{figure}
-
 
 We can also set the alignment of plots easily with the \texttt{fig.align}
 option; this document uses \texttt{fig.align='center'} as a global
@@ -219,10 +209,9 @@ option, and we can also set plots to be left/right-aligned. Figure
 stars(cbind(1:16,10*(16:1)),draw.segments=TRUE)
 @
 
-\protect\caption{A left-aligned plot adapted from \texttt{?stars} (I call this the
+\caption{A left-aligned plot adapted from \texttt{?stars} (I call this the
 ``Maruko'' plot, and it is one of my favorites; see \protect\url{http://en.wikipedia.org/wiki/Chibi_Maruko-chan}).\label{fig:maruko-plot}}
 \end{figure}
-
 
 
 \section{Plot Size}
@@ -235,7 +224,6 @@ it is less than $1/3$ of the line width, three plots can be put in
 one line. Of course we can also set it to be an absolute width like
 \texttt{3in} (3 inches). This option is used extensively in this document
 to control the size of plots in the output document.
-
 
 \section{The tikz Device}
 
@@ -251,12 +239,12 @@ plot(0:1,0:1,type='n', ylab='origin of statistics', xlab='statistical presentati
 text(.5,c(.8,.5,.2), c('\\texttt{lm(y \\textasciitilde{} x)}', '$\\hat{\\beta}=(X^{\\prime}X)^{-1}X^{\\prime}y$',  '$(\\Omega,\\mathcal{F},\\mu)$'))
 @
 
-\protect\caption{A plot created by \textbf{tikzDevice} with math expressions and typewriter
-fonts. Note the font style consistency -- we write the same expressions
-in \protect\LaTeX{} here: $\hat{\beta}=(X^{\prime}X)^{-1}X^{\prime}y$ and
-$(\Omega,\mathcal{F},\mu)$; also \texttt{lm(y \textasciitilde{} x)}.\label{fig:math-formula-tt}}
+\caption{A plot created by \textbf{tikzDevice} with math expressions and typewriter
+fonts. Note the font style consistency \textendash{} we write the
+same expressions in \protect\LaTeX{} here: $\hat{\beta}=(X^{\prime}X)^{-1}X^{\prime}y$
+and $(\Omega,\mathcal{F},\mu)$; also \texttt{lm(y \textasciitilde{}
+x)}.\label{fig:math-formula-tt}}
 \end{figure}
-
 
 When using Xe\LaTeX{} instead of PDF\LaTeX{} to compile the document,
 we need to tell the \textbf{tikzDevice} package by setting the \texttt{tikzDefaultEngine}
@@ -268,7 +256,6 @@ options(tikzDefaultEngine='xetex')
 
 This is useful and often necessary to compile tikz plots which contain
 (UTF8) multi-byte characters.
-
 
 \section{Figure Caption}
 
@@ -285,12 +272,10 @@ a float environment, it can float away from the chunk output to other
 places such as the top or bottom of a page when the \TeX{} document
 is compiled.
 
-
 \section{Other Features}
 
 The \textbf{knitr} package can be extended with hook functions, and
 here I give a few examples illustrating the flexibility.
-
 
 \subsection{Cropping PDF Graphics}
 
@@ -320,9 +305,8 @@ plot(lat~long,data=quakes,pch=20,col=rgb(0,0,0,.2))
 @
 \end{kframe}
 
-\protect\caption{The original plot produced in R, with a large margin.\label{fig:pdf-nocrop}}
+\caption{The original plot produced in R, with a large margin.\label{fig:pdf-nocrop}}
 \end{figure}
-
 
 \begin{figure}
 \begin{kframe}
@@ -330,9 +314,8 @@ plot(lat~long,data=quakes,pch=20,col=rgb(0,0,0,.2))
 @
 \end{kframe}
 
-\protect\caption{The cropped plot; it fits better in the document.\label{fig:pdf-crop}}
+\caption{The cropped plot; it fits better in the document.\label{fig:pdf-crop}}
 \end{figure}
-
 
 As we can see, the white margins are gone. If we use \emph{par()},
 it might be hard and tedious to figure out a reasonable amount of
@@ -340,7 +323,6 @@ margin in order that neither is any label cropped nor do we get a
 too large margin. My experience is that \texttt{pdfcrop} works well
 with base graphics, but barely works with \textbf{grid} graphics (therefore
 \textbf{lattice} and \textbf{ggplot2} are ruled out).
-
 
 \subsection{Manually Saved Plots}
 
@@ -388,7 +370,6 @@ for (i in 1:length(zm)) {
 }
 @
 
-
 \subsection{rgl Plots}
 
 With the hook \emph{hook\_rgl()}, we can easily save snapshots from
@@ -402,8 +383,8 @@ and \texttt{dpi} to calculate the expected size of the window, then
 resize the current window by \emph{par3d()}, and finally save the
 plot.
 
-This hook is actually built upon \emph{hook\_plot\_custom()} -- first
-it saves the \textbf{rgl} snapshot, then it calls \emph{hook\_plot\_custom()}
+This hook is actually built upon \emph{hook\_plot\_custom()} \textendash{}
+first it saves the \textbf{rgl} snapshot, then it calls \emph{hook\_plot\_custom()}
 to write the output code.
 
 \appendix
@@ -416,6 +397,7 @@ to compile. These packages are required (all of them are free software):
 \item [{R}] Cairo, ggplot2, tikzDevice, rgl, rggobi, animation (all available
 on CRAN except tikzDevice which is on R-Forge for the time being)
 \item [{\LaTeX{}}] animate, hyperref and the tufte-handout class
-\item [{Other}] GGobi, pdfcrop\end{description}
+\item [{Other}] GGobi, pdfcrop
+\end{description}
 
 \end{document}

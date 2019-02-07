@@ -46,7 +46,11 @@ knit_code = new_defaults()
 
 # strip the pattern in code
 strip_block = function(x, prefix = NULL) {
-  if (!is.null(prefix) && (length(x) > 1)) x[-1L] = sub(prefix, '', x[-1L])
+  if (!is.null(prefix) && (length(x) > 1)) {
+    x[-1L] = sub(prefix, '', x[-1L])
+    spaces = min(attr(regexpr("^ *", x[-1L]), "match.length"))
+    if (spaces > 0) x[-1L] = substring(x[-1L], spaces + 1)
+  }
   x
 }
 
@@ -60,8 +64,8 @@ parse_block = function(code, header, params.src) {
   engine = 'r'
   # consider the syntax ```{engine, opt=val} for chunk headers
   if (out_format('markdown')) {
-    engine = sub('^([a-zA-Z]+).*$', '\\1', params)
-    params = sub('^([a-zA-Z]+)', '', params)
+    engine = sub('^([a-zA-Z0-9_]+).*$', '\\1', params)
+    params = sub('^([a-zA-Z0-9_]+)', '', params)
   }
   params = gsub('^\\s*,*|,*\\s*$', '', params) # rm empty options
   # turn ```{engine} into ```{r, engine="engine"}
@@ -76,6 +80,9 @@ parse_block = function(code, header, params.src) {
   if (nzchar(spaces <- gsub('^([\t >]*).*', '\\1', header))) {
     params$indent = spaces
     code = gsub(sprintf('^%s', spaces), '', code)
+    # in case the trailing spaces of the indent string are trimmed on certain
+    # lines (e.g. in blockquotes https://github.com/yihui/knitr/issues/1446)
+    code = gsub(sprintf('^%s', gsub('\\s+$', '', spaces)), '', code)
   }
 
   label = params$label; .knitEnv$labels = c(.knitEnv$labels, label)
@@ -117,7 +124,7 @@ parse_params = function(params) {
     eval(parse_only(paste('alist(', quote_label(params), ')'))),
     error = function(e) {
       message('(*) NOTE: I saw chunk options "', params,
-              '"\n please go to http://yihui.name/knitr/options',
+              '"\n please go to https://yihui.name/knitr/options',
               '\n (it is likely that you forgot to quote "character" options)')
     })
 
@@ -234,16 +241,20 @@ print.inline = function(x, ...) {
 #' supposed to be unique so that the numeric positions returned from
 #' \code{grep()} will be of the same length of \code{from}/\code{to}. Note
 #' \code{labels} always has to match the length of \code{from} and \code{to}.
-#' @param path the path to the R script
-#' @param lines a character vector of the code lines (by default read from
-#'   \code{path})
-#' @param labels a character vector of chunk labels (default \code{NULL})
-#' @param from,to a numeric vector specifying the starting/ending line numbers
-#'   of code chunks, or a character vector; see Details
-#' @param from.offset,to.offset an offset to be added to \code{from}/\code{to}
+#' @param path Path to the R script.
+#' @param lines Character vector of lines of code. By default, this is read from
+#'   \code{path}.
+#' @param labels Character vector of chunk labels (default \code{NULL}).
+#' @param from,to Numeric vector specifying the starting/ending line numbers of
+#'   code chunks, or a character vector; see Details.
+#' @param from.offset,to.offset Offsets to be added to \code{from}/\code{to}.
+#' @param roxygen_comments Logical dictating whether to keep trailing
+#'   roxygen-style comments from code chunks in addition to whitespace
 #' @return As a side effect, code chunks are read into the current session so
-#'   that future chunks can (re)use the code by chunk label references.
-#' @references \url{http://yihui.name/knitr/demo/externalization/}
+#'   that future chunks can (re)use the code by chunk label references. If an
+#'   external chunk has the same label as a chunk in the current session, chunk
+#'   label references by future chunks will refer to the external chunk.
+#' @references \url{https://yihui.name/knitr/demo/externalization/}
 #' @note This function can only be used in a chunk which is \emph{not} cached
 #'   (chunk option \code{cache = FALSE}), and the code is read and stored in the
 #'   current session \emph{without} being executed (to actually run the code,
@@ -272,8 +283,10 @@ print.inline = function(x, ...) {
 #' ## later you can use, e.g., <<foo>>=
 #' knitr:::knit_code$get() # use this to check chunks in the current session
 #' knitr:::knit_code$restore() # clean up the session
-read_chunk = function(path, lines = readLines(path, warn = FALSE),
-                      labels = NULL, from = NULL, to = NULL, from.offset = 0L, to.offset = 0L) {
+read_chunk = function(
+  path, lines = readLines(path, warn = FALSE), labels = NULL, from = NULL, to = NULL,
+  from.offset = 0L, to.offset = 0L, roxygen_comments = TRUE
+) {
   if (!length(lines)) {
     warning('code is empty')
     return(invisible())
@@ -300,15 +313,16 @@ read_chunk = function(path, lines = readLines(path, warn = FALSE),
     idx = c(0, idx); lines = c('', lines)  # no chunk header in the beginning
   }
   groups = unname(split(lines, idx))
-  labels = stringr::str_trim(gsub(lab, '\\2', sapply(groups, `[`, 1)))
+  labels = stringr::str_trim(gsub(lab, '\\3', sapply(groups, `[`, 1)))
   labels = gsub(',.*', '', labels)  # strip off possible chunk options
-  code = lapply(groups, strip_chunk)
+  code = lapply(groups, strip_chunk, roxygen_comments)
   for (i in which(!nzchar(labels))) labels[i] = unnamed_chunk()
   knit_code$set(setNames(code, labels))
 }
+
 #' @rdname read_chunk
-#' @param topic,package name of the demo and the package see \code{\link[utils]{demo}}
-#' @param ... arguments to be passed to \code{\link{read_chunk}}
+#' @param topic,package Name of the demo and the package. See \code{\link[utils]{demo}}.
+#' @param ... Arguments passed to \code{\link{read_chunk}}.
 #' @export
 read_demo = function(topic, package = NULL, ...) {
   paths = list.files(file.path(find.package(package), 'demo'), full.names = TRUE)
@@ -329,14 +343,21 @@ pattern_index = function(pattern, text) {
   })
 }
 
-strip_chunk = function(x) strip_white(x[-1])
-# strip lines that are pure white spaces
-strip_white = function(x) {
+strip_chunk = function(x, roxygen_comments = TRUE) {
+  x = x[-1]
+  strip_white(x, if (roxygen_comments) is_blank else function(line) {
+    is_blank(line) || grepl("^#+'[ ]?", line)
+  })
+}
+
+# strip lines that are pure white spaces or
+# that match the test_strip condition(s)
+strip_white = function(x, test_strip = is_blank) {
   if (!length(x)) return(x)
-  while (is_blank(x[1])) {
+  while (test_strip(x[1])) {
     x = x[-1]; if (!length(x)) return(x)
   }
-  while (is_blank(x[(n <- length(x))])) {
+  while (test_strip(x[(n <- length(x))])) {
     x = x[-n]; if (n < 2) return(x)
   }
   x
@@ -376,18 +397,20 @@ filter_chunk_end = function(chunk.begin, chunk.end) {
 
 #' Get all chunk labels in a document
 #'
-#' This function returns all chunk labels as a chracter vector. Optionally, you
-#' can specify a series of conditions to filter the labels.
+#' The function \code{all_labels()} returns all chunk labels as a character
+#' vector. Optionally, you can specify a series of conditions to filter the
+#' labels. The function `all_rcpp_labels()` is a wrapper function for
+#' \code{all_labels(engine == 'Rcpp')}.
 #'
 #' For example, suppose the condition expression is \code{engine == 'Rcpp'}, the
 #' object \code{engine} is the local chunk option \code{engine}; if an
 #' expression fails to be evaluated (e.g. when a certain object does not exist),
 #' \code{FALSE} is returned and the label for this chunk will be filtered out.
-#' @param ... a series of R expressions, each of which should return \code{TRUE}
+#' @param ... A vector of R expressions, each of which should return \code{TRUE}
 #'   or \code{FALSE}; the expressions are evaluated using the local chunk
-#'   options of each code chunk as the environment
+#'   options of each code chunk as the environment.
 #' @note Empty code chunks are always ignored, including those chunks that are
-#'   empty originally in the document but filled with code using chunk options
+#'   empty in the original document but filled with code using chunk options
 #'   such as \code{ref.label} or \code{code}.
 #' @return A character vector.
 #' @export
@@ -404,22 +427,32 @@ all_labels = function(...) {
 
   if (length(cond) == 0) return(labels)
 
-  params = lapply(code, attr, 'chunk_opts', exact = TRUE)
+  params = lapply(code, attr, 'chunk_opts')
   idx = rep_len(TRUE, length(labels))
   for (i in seq_along(cond)) {
     for (j in seq_along(params)) {
       # need tryCatch() because the expression cond[[i]] may trigger an error
       # when any variable is not found, e.g. not all chunks have the engine
       # option when the condition is engine == 'Rcpp'
-      if (idx[j]) idx[j] = tryCatch(
-        eval(cond[[i]], envir = params[[j]], enclos = knit_global()),
+      try_eval = function(expr) tryCatch(
+        eval(expr, envir = params[[j]], enclos = knit_global()),
         error = function(e) FALSE
       )
+      if (idx[j]) {
+        res = try_eval(cond[[i]])
+        # the condition could be evaluated to an expression; see all_rcpp_labels()
+        if (is.expression(res)) res = try_eval(res)
+        idx[j] = res
+      }
     }
   }
 
   labels[idx]
 }
+
+#' @rdname all_labels
+#' @export
+all_rcpp_labels = function(...) all_labels(expression(engine == 'Rcpp'), ...)
 
 #' Wrap code using the inline R expression syntax
 #'
@@ -428,10 +461,10 @@ all_labels = function(...) {
 #' R Markdown document, you may write \samp{`` `r knitr::inline_expr('1+1')`
 #' ``}; for Rnw documents, this may be
 #' \samp{\verb|\Sexpr{knitr::inline_expr{'1+1'}}|}.
-#' @param code a character string of the inline R source code
-#' @param syntax a character string to specify the syntax, e.g. \code{rnw},
-#'   \code{html}, or \code{md}, etc; if not specified, it will be guessed from
-#'   the knitting context
+#' @param code Character string of the inline R source code.
+#' @param syntax A character string to specify the syntax, e.g. \code{rnw},
+#'   \code{html}, or \code{md}. If not specified, this will be guessed from
+#'   the knitting context.
 #' @return A character string marked up using the inline R code syntax.
 #' @export
 #' @examples library(knitr)

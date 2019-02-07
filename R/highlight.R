@@ -9,13 +9,16 @@ hilight_source = function(x, format, options) {
         if (format == 'html') highr:::escape_html(x) else highr:::escape_latex(x)
       } else {
         highlight_header()
+        n = length(res)
+        # do not touch font size
+        if (res[n] == '\\normalsize') res = res[-n]
         res
       }
     }
   } else if (options$prompt) {
     # if you did not reformat or evaluate the code, I have to figure out which
     # lines belong to one complete expression first (#779)
-    if (!options$tidy && isFALSE(options$eval))
+    if (options$engine == 'R' && isFALSE(options$tidy) && isFALSE(options$eval))
       x = vapply(highr:::group_src(x), paste, character(1), collapse = '\n')
     line_prompt(x)
   } else x
@@ -132,7 +135,8 @@ styler_assistant_latex = function(x) {
     }
     sprintf('%s#1%s', start, end)
   })
-  sprintf('\\newcommand{\\hl%s}[1]{%s}%%', names(x), styles)
+  res = sprintf('\\newcommand{\\hl%s}[1]{%s}%%', names(x), styles)
+  c(res, '\\let\\hlipl\\hlkwb')
 }
 
 col2latexrgb = function(hex) {

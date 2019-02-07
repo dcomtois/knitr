@@ -11,11 +11,14 @@ inst/examples/cache
 knitr-minimal.md
 knitr-spin.md
 png$
-NEWS.md
 ^\.Rproj\.user$
 ^.*\.Rproj$
 ^\.travis\.yml$
 FAQ.md
 Makefile
 ^knitr-examples$
-^CONTRIBUTING\.md$
+^\.github$
+^docs$
+^README-ES\.md$
+^README-PT\.md$
+^codecov\.yml$

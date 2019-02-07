@@ -14,11 +14,11 @@
 #' opt1=val1, opt2=val2}, which will be copied to the template; if no chunk
 #' headers are found, the whole R script will be inserted into the template as
 #' one code chunk.
-#' @param script path to the R script
-#' @param template path of the template to use (by default the Rnw template in
-#'   this package; there is also an HTML template in \pkg{knitr})
-#' @param output the output filename (passed to \code{\link{knit}}); by default
-#'   it uses the base filename of the script
+#' @param script Path to the R script.
+#' @param template Path of the template to use. By default, the Rnw template in
+#'   this package; there is also an HTML template in \pkg{knitr}.
+#' @param output Output filename, passed to \code{\link{knit}}). By default,
+#'   the base filename of the script is used.
 #' @inheritParams knit
 #' @return path of the output document
 #' @export
@@ -39,7 +39,7 @@ stitch = function(script,
   if (comment_to_var(lines[1L], '.knitr.title', '^#+ *title:', envir)) lines = lines[-1L]
   if (comment_to_var(lines[1L], '.knitr.author', '^#+ *author:', envir)) lines = lines[-1L]
   input = basename(template)
-  input = sub_ext(basename(if (nosrc) script else tempfile()), file_ext(input))
+  input = with_ext(basename(if (nosrc) script else tempfile()), file_ext(input))
   txt = readLines(template, warn = FALSE)
   i = grep('%sCHUNK_LABEL_HERE', txt)
   if (length(i) != 1L) stop('Wrong template for stitch: ', template)
@@ -48,7 +48,7 @@ stitch = function(script,
   if (length(j) == 0) {
     lines = c(sprintf(h, 'auto-report'), lines)
   } else {
-    lines[j] = sprintf(h, gsub(.sep.label, '\\2', lines[j]))
+    lines[j] = sprintf(h, gsub(.sep.label, '\\3', lines[j]))
     if (j[1] != 1L) lines = c(sprintf(h, ''), lines)
   }
   txt[i] = paste(lines, collapse = '\n')
@@ -65,26 +65,29 @@ stitch = function(script,
 
   out = knit(input, output, envir = envir, text = txt)
   switch(file_ext(out), tex = {
-    tools::texi2pdf(out, clean = TRUE)
-    message('PDF output at: ', sub_ext(out, 'pdf'))
+    tinytex::latexmk(out)
+    message('PDF output at: ', with_ext(out, 'pdf'))
   }, md = {
-    out.html = sub_ext(out, 'html')
+    out.html = with_ext(out, 'html')
     markdown::markdownToHTML(out, out.html)
     message('HTML output at: ', out.html)
   })
   out
 }
 #' @rdname stitch
-#' @param ... arguments passed to \code{stitch()}
+#' @param ... Arguments passed to \code{stitch()}.
 #' @export
-stitch_rhtml = function(...) {
-  stitch(..., template = system.file('misc', 'knitr-template.Rhtml', package = 'knitr'))
-}
+stitch_rhtml = function(..., envir = parent.frame()) stitch(
+  ..., envir = envir,
+  template = system.file('misc', 'knitr-template.Rhtml', package = 'knitr')
+)
+
 #' @rdname stitch
 #' @export
-stitch_rmd = function(...) {
-  stitch(..., template = system.file('misc', 'knitr-template.Rmd', package = 'knitr'))
-}
+stitch_rmd = function(..., envir = parent.frame()) stitch(
+  ..., envir = envir,
+  template = system.file('misc', 'knitr-template.Rmd', package = 'knitr')
+)
 
 #' A simple macro preprocessor for templating purposes
 #'
@@ -92,16 +95,15 @@ stitch_rmd = function(...) {
 #' (this tag can be customized by the \code{delim} argument). These expressions
 #' are extracted, evaluated and replaced by their values in the original
 #' template.
-#' @param file the template file
-#' @param ... a list of variables to be used for the code in the template; note
-#'   the variables will be searched in the parent frame as well
-#' @param text an alternative way to \code{file} to specify the template code
-#'   directly (if provided, \code{file} will be ignored)
-#' @param delim the (opening and ending) delimiters for the templating tags
+#' @param file The template file.
+#' @param ... A list of variables to be used for the code in the template; note that
+#'   the variables will be searched for in the parent frame as well.
+#' @param text Character vector of lines of code. An alternative way to specify
+#'   the template code directly. If \code{text} is provided, \code{file} will be ignored.
+#' @param delim A pair of opening and closing delimiters for the templating tags.
 #' @return A character vector, with the tags evaluated and replaced by their
 #'   values.
-#' @references This function was inspired by the pyexpander
-#'   (\url{http://pyexpander.sourceforge.net}) and m4
+#' @references This function was inspired by the pyexpander and m4
 #'   (\url{http://www.gnu.org/software/m4/}), thanks to Frank Harrell.
 #' @export
 #' @examples # see the knit_expand vignette
@@ -115,7 +117,6 @@ knit_expand = function(file, ..., text = readLines(file, warn = FALSE),
   delim = paste0(delim[1L], '((.|\n)+?)', delim[2L])
 
   txt = paste(text, collapse = '\n')
-  if (packageVersion('stringr') <= '0.9.0') delim = stringr::perl(delim)
   loc = stringr::str_locate_all(txt, delim)[[1L]]
   if (nrow(loc) == 0L) return(txt) # no match
   mat = stringr::str_extract_all(txt, delim)[[1L]]

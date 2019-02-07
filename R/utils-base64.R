@@ -3,8 +3,8 @@
 #' This function takes an image file and uses the \pkg{markdown} package to
 #' encode it as a base64 string, which can be used in the \code{img} tag in
 #' HTML.
-#' @param f the path to the image file
-#' @return a character string (the data URI)
+#' @param f Path to the image file.
+#' @return The data URI as a character string.
 #' @author Wush Wu and Yihui Xie
 #' @export
 #' @references \url{http://en.wikipedia.org/wiki/Data_URI_scheme}
@@ -16,10 +16,7 @@ image_uri = function(f) markdown:::.b64EncodeFile(f)
 # alternative approaches to base64 encoding
 image_uri2 = function(f) {
   content = readBin(f, what = 'raw', n = file.info(f)$size)
-  uri = if (has_package('RCurl')) {
-    paste(RCurl::base64Encode(content, 'character'), collapse = '')
-  } else base64_encode(content)
-  paste0('data:', mime_type(f), ';base64,', uri)
+  paste0('data:', mime_type(f), ';base64,', base64_encode(content))
 }
 
 base64_table = c(LETTERS, letters, 0:9, '+', '/')

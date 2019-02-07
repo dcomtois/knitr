@@ -35,7 +35,7 @@ with(mtcars, {
 })
 ```
 
-![plot of chunk graphics](http://animation.r-forge.r-project.org/ideas/figure/graphics-1.png) 
+![plot of chunk graphics](http://animation.r-forge.r-project.org/ideas/figure/graphics-1.png)
 
 ## Inline code
 
@@ -71,4 +71,4 @@ knit("knitr-minimal.Rmd")
 
 ## Conclusion
 
-Markdown is super easy to write. Go to **knitr** [homepage](http://yihui.name/knitr) for details.
+Markdown is super easy to write. Go to **knitr** [homepage](https://yihui.name/knitr) for details.

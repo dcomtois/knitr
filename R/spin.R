@@ -3,34 +3,34 @@
 #' This function takes a specially formatted R script and converts it to a
 #' literate programming document. By default normal text (documentation) should
 #' be written after the roxygen comment (\code{#'}) and code chunk options are
-#' written after \code{#+} or \code{#-} or \code{# ----}.
+#' written after \code{#+} or \code{#-} or \code{# ----} or any of these
+#' combinations replacing \code{#} with \code{--}.
 #'
 #' Obviously the goat's hair is the original R script, and the wool is the
 #' literate programming document (ready to be knitted).
-#' @param hair the path to the R script
-#' @param knit logical: whether to compile the document after conversion
-#' @param report logical: whether to generate report for \file{Rmd}, \file{Rnw}
-#'   and \file{Rtex} output (ignored if \code{knit = FALSE})
-#' @param text a character vector as an alternative way to \code{hair} to
-#'   provide the R source; if \code{text} is not \code{NULL}, \code{hair} will
-#'   be ignored
-#' @param envir the environment for \code{\link{knit}()} to evaluate the code
-#' @param format character: the output format (it takes five possible values);
-#'   the default is R Markdown
-#' @param doc a regular expression to identify the documentation lines; by
+#' @param hair Path to the R script. The script must be encoded in UTF-8 if it
+#'   contains multibyte characters.
+#' @param knit Logical; whether to compile the document after conversion.
+#' @param report Logical; whether to generate a report for \file{Rmd},
+#'   \file{Rnw} and \file{Rtex} output. Ignored if \code{knit = FALSE}.
+#' @param text A character vector of code, as an alternative way to provide the
+#'   R source. If \code{text} is not \code{NULL}, \code{hair} will be ignored.
+#' @param envir Environment for \code{\link{knit}()} to evaluate the code.
+#' @param format Character; the output format. The default is R Markdown.
+#' @param doc A regular expression to identify the documentation lines; by
 #'   default it follows the roxygen convention, but it can be customized, e.g.
 #'   if you want to use \code{##} to denote documentation, you can use
-#'   \code{'^##\\\\s*'}
-#' @param inline a regular expression to identify inline R expressions; by
-#'   default, code of the form \code{((code))} on its own line is treated as an
-#'   inline expression
-#' @param comment a pair of regular expressions for the start and end delimiters
+#'   \code{'^##\\\\s*'}.
+#' @param inline A regular expression to identify inline R expressions; by
+#'   default, code of the form \code{\{\{code\}\}} on its own line is treated as
+#'   an inline expression.
+#' @param comment A pair of regular expressions for the start and end delimiters
 #'   of comments; the lines between a start and an end delimiter will be
-#'   ignored; by default, the delimiters are \verb{/*} in the beginning and
-#'   \verb{*/} in the end of a line (following the convention of C comments)
+#'   ignored. By default, the delimiters are \verb{/*} at the beginning of a
+#'   line, and \verb{*/} at the end, following the convention of C comments.
 #' @param precious logical: whether intermediate files (e.g., \code{.Rmd} files
-#'   when \code{format} is \code{"Rmd"}) should be preserved; default
-#'   \code{FALSE} if \code{knit == TRUE} and input is a file
+#'   when \code{format} is \code{"Rmd"}) should be preserved. The default is
+#'   \code{FALSE} if \code{knit} is \code{TRUE} and the input is a file.
 #' @author Yihui Xie, with the original idea from Richard FitzJohn (who named it
 #'   as \code{sowsear()} which meant to make a silk purse out of a sow's ear)
 #' @return If \code{text} is \code{NULL}, the path of the final output document,
@@ -47,26 +47,7 @@
 #'   \code{rmarkdown::\link[rmarkdown]{render}()} instead.
 #' @export
 #' @seealso \code{\link{stitch}} (feed a template with an R script)
-#' @references \url{http://yihui.name/knitr/demo/stitch/}
-#' @examples #' write normal text like this and chunk options like below
-#'
-#' #+ label, opt=value
-#'
-#' # /*
-#' #' these lines are treated as comments in spin()
-#' 1+1
-#' # */
-#'
-#' (s = system.file('examples', 'knitr-spin.R', package = 'knitr'))
-#' spin(s)  # default markdown
-#' o = spin(s, knit = FALSE) # convert only; do not make a purse yet
-#' knit2html(o) # compile to HTML
-#'
-#' # other formats
-#' spin(s, FALSE, format='Rnw')  # you need to write documentclass after #'
-#' spin(s, FALSE, format='Rhtml')
-#' spin(s, FALSE, format='Rtex')
-#' spin(s, FALSE, format='Rrst')
+#' @references \url{https://yihui.name/knitr/demo/stitch/}
 spin = function(
   hair, knit = TRUE, report = TRUE, text = NULL, envir = parent.frame(),
   format = c('Rmd', 'Rnw', 'Rhtml', 'Rtex', 'Rrst'),
@@ -75,7 +56,7 @@ spin = function(
 ) {
 
   format = match.arg(format)
-  x = if (nosrc <- is.null(text)) readLines(hair, warn = FALSE) else split_lines(text)
+  x = if (nosrc <- is.null(text)) read_utf8(hair) else split_lines(text)
   stopifnot(length(comment) == 2L)
   c1 = grep(comment[1], x); c2 = grep(comment[2], x)
   if (length(c1) != length(c2))
@@ -83,11 +64,18 @@ spin = function(
   # remove comments
   if (length(c1)) x = x[-unique(unlist(mapply(seq, c1, c2, SIMPLIFY = FALSE)))]
 
-  p = .fmt.pat[[tolower(format)]]
-  # turn ((expr)) into inline expressions, e.g. `r expr` or \Sexpr{expr}
-  if (any(i <- grepl(inline, x))) x[i] = gsub(inline, p[4], x[i])
+  # remove multiline string literals and symbols (note that this ignores lines with spaces at their
+  # beginnings, assuming doc and inline regex don't match these lines anyway)
+  parsed_data = getParseData(parse(text = x, keep.source = TRUE))
+  is_matchable = seq_along(x) %in% unique(parsed_data[parsed_data$col1 == 1, 'line1'])
 
-  r = rle(grepl(doc, x) | i)  # inline expressions are treated as doc instead of code
+  # .Rmd needs to be treated specially
+  p = if (identical(tolower(format), 'rmd')) .fmt.rmd(x) else .fmt.pat[[tolower(format)]]
+
+  # turn {{expr}} into inline expressions, e.g. `r expr` or \Sexpr{expr}
+  if (any(i <- is_matchable & grepl(inline, x))) x[i] = gsub(inline, p[4], x[i])
+
+  r = rle((is_matchable & grepl(doc, x)) | i)  # inline expressions are treated as doc instead of code
   n = length(r$lengths); txt = vector('list', n); idx = c(0L, cumsum(r$lengths))
   p1 = gsub('\\{', '\\\\{', paste0('^', p[1L], '.*', p[2L], '$'))
 
@@ -100,8 +88,13 @@ spin = function(
       # R code; #+/- indicates chunk options
       block = strip_white(block) # rm white lines in beginning and end
       if (!length(block)) next
-      if (length(opt <- grep('^#+(\\+|-| ----+| @knitr)', block))) {
-        block[opt] = paste0(p[1L], gsub('^#+(\\+|-| ----+| @knitr)\\s*|-*\\s*$', '', block[opt]), p[2L])
+      if (length(opt <- grep(rc <- '^(#|--)+(\\+|-| ----+| @knitr)', block))) {
+        block[opt] = paste0(p[1L], gsub(paste0(rc, '\\s*|-*\\s*$'), '', block[opt]), p[2L])
+        # close each chunk if there are multiple chunks in this block
+        if (any(opt > 1)) {
+          j = opt[opt > 1]
+          block[j] = paste(p[3L], block[j], sep = '\n')
+        }
       }
       if (!grepl(p1, block[1L])) {
         block = c(paste0(p[1L], p[2L]), block)
@@ -116,31 +109,45 @@ spin = function(
     txt = c('\\documentclass{article}', '\\begin{document}', txt, '\\end{document}')
   }
   if (nosrc) {
-    outsrc = sub_ext(hair, format)
-    cat(txt, file = outsrc, sep = '\n')
+    outsrc = with_ext(hair, format)
+    xfun::write_utf8(txt, outsrc)
     txt = NULL
   } else outsrc = NULL
   if (!knit) return(txt %n% outsrc)
 
   out = if (report) {
     if (format == 'Rmd') {
-      knit2html(outsrc, text = txt, envir = envir)
+      knit2html(outsrc, text = txt, envir = envir, encoding = 'UTF-8')
     } else if (!is.null(outsrc) && (format %in% c('Rnw', 'Rtex'))) {
       knit2pdf(outsrc, envir = envir)
     }
-  } else knit(outsrc, text = txt, envir = envir)
+  } else knit(outsrc, text = txt, envir = envir, encoding = 'UTF-8')
 
   if (!precious && !is.null(outsrc)) file.remove(outsrc)
   invisible(out)
 }
 
 .fmt.pat = list(
-  rmd = c('```{r ', '}', '```', '`r \\1`'),
   rnw = c('<<', '>>=', '@', '\\\\Sexpr{\\1}'),
   rhtml = c('<!--begin.rcode ', '', 'end.rcode-->', '<!--rinline \\1 -->'),
   rtex = c('% begin.rcode ', '', '% end.rcode', '\\\\rinline{\\1}'),
   rrst = c('.. {r ', '}', '.. ..', ':r:`\\1`')
 )
+
+# determine how many backticks we need to wrap code blocks and inline code
+.fmt.rmd = function(x) {
+  x = paste(x, collapse = '\n')
+  l = attr(gregexpr('`+', x)[[1]], 'match.length')
+  l = max(l, 0)
+  if (length(l) > 0) {
+    i = highr:::spaces(l + 1, '`')
+    b = highr:::spaces(max(l + 1, 3), '`')
+  } else {
+    i = '`'
+    b = '```'
+  }
+  c(paste0(b, '{r '), '}', b, paste0(i, 'r \\1 ', i))
+}
 
 #' Spin a child R script
 #'
@@ -152,9 +159,9 @@ spin = function(
 #' to compile it. You can call this function in R code, or using the syntax of
 #' inline R expressions in \code{\link{spin}()} (e.g.
 #' \code{{{knitr::spin_child('script.R')}}}).
-#' @param input the filename of the input R script
-#' @param format to be passed to \code{format} in \code{spin()}; if not
-#'   provided, it will be guessed from the current knitting process
+#' @param input Filename of the input R script.
+#' @param format Passed to \code{format} in \code{spin()}. If not
+#'   provided, it will be guessed from the current knitting process.
 #' @return A character string of the knitted R script.
 #' @export
 spin_child = function(input, format) {

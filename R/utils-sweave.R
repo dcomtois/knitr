@@ -34,22 +34,21 @@
 #' no chunk is before it, it is also removed, because \pkg{knitr} only uses one
 #' \samp{@@} after \samp{<<>>=} by default (which is not the original Noweb
 #' syntax but more natural).
-#' @param file the filename of the Rnw file
-#' @param output the output filename (by default \file{file.Rnw} produces
+#' @param file Path to the Rnw file (must be encoded in UTF-8).
+#' @param output Output file path. By default, \file{file.Rnw} produces
 #'   \file{file-knitr.Rnw}); if \code{text} is not NULL, no output file will be
-#'   produced
-#' @param encoding the encoding of the Rnw file
-#' @param text an alternative way to provide the Sweave code as a character
-#'   string (if provided, the \code{file} will be ignored)
+#'   produced.
+#' @param text An alternative way to provide the Sweave code as a character
+#'   string. If \code{text} is provided, \code{file} will be ignored.
 #' @return If \code{text} is \code{NULL}, the \code{output} file is written and
-#'   \code{NULL} is returned, otherwise the converted text string is returned.
+#'   \code{NULL} is returned. Otherwise, the converted text string is returned.
 #' @note If \samp{\\SweaveOpts{}} spans across multiple lines, it will not be
 #'   fixed, and you have to fix it manually. The LaTeX-style syntax of Sweave
 #'   chunks are ignored (see \code{?SweaveSyntaxLatex}); only the Noweb syntax
 #'   is supported.
 #' @seealso \code{\link{Sweave}}, \code{\link{gsub}}
 #' @references The motivation of the changes in the syntax:
-#'   \url{http://yihui.name/knitr/demo/sweave/}
+#'   \url{https://yihui.name/knitr/demo/sweave/}
 #' @export
 #' @examples Sweave2knitr(text='<<echo=TRUE>>=') # this is valid
 #' Sweave2knitr(text="<<png=true>>=") # dev='png'
@@ -61,9 +60,9 @@
 #' testfile = system.file("Sweave", "Sweave-test-1.Rnw", package = "utils")
 #' Sweave2knitr(testfile, output = 'Sweave-test-knitr.Rnw')
 #' knit('Sweave-test-knitr.Rnw') # or knit2pdf() directly
-Sweave2knitr = function(file, output = gsub('[.]([^.]+)$', '-knitr.\\1', file),
-                        encoding = getOption('encoding'), text = NULL) {
-  x = if (is.null(text)) readLines(file(file, encoding = encoding), warn = FALSE) else text
+Sweave2knitr = function(file, output = gsub('[.]([^.]+)$', '-knitr.\\1', file), text = NULL) {
+  x = text
+  if (is.null(x)) x = read_utf8(file)
   x = native_encode(x)
   x = gsub_msg('removing \\usepackage{Sweave}',
                '^\\s*\\\\usepackage(\\[.*\\])?\\{Sweave\\}', '', x)
@@ -93,10 +92,7 @@ Sweave2knitr = function(file, output = gsub('[.]([^.]+)$', '-knitr.\\1', file),
             paste(formatUL(sprintf('(#%d) %s', i, x[i]), offset = 4), collapse = '\n'))
     x = x[-i]
   }
-  if (is.null(text)) {
-    if (encoding != 'native.enc') x = native_encode(x, encoding)
-    cat(x, sep = '\n', file = output)
-  } else x
+  if (is.null(text)) write_utf8(x, output) else x
 }
 
 gsub_msg = function(msg, pattern, replacement, x, ...) {

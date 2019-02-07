@@ -2,32 +2,43 @@
 #'
 #' This is a very simple table generator. It is simple by design. It is not
 #' intended to replace any other R packages for making tables.
-#' @param x an R object (typically a matrix or data frame)
-#' @param format a character string; possible values are \code{latex},
+#'
+#' Missing values (\code{NA}) in the table are displayed as \code{NA} by
+#' default. If you want to display them with other characters, you can set the
+#' option \code{knitr.kable.NA}, e.g. \code{options(knitr.kable.NA = '')} to
+#' hide \code{NA} values.
+#' @param x An R object, typically a matrix or data frame.
+#' @param format A character string. Possible values are \code{latex},
 #'   \code{html}, \code{markdown}, \code{pandoc}, and \code{rst}; this will be
 #'   automatically determined if the function is called within \pkg{knitr}; it
-#'   can also be set in the global option \code{knitr.table.format}; if
-#'   \code{format} is a function, it must return a character string
-#' @param digits the maximum number of digits for numeric columns (passed to
-#'   \code{round()}); it can also be a vector of length \code{ncol(x)} to set
-#'   the number of digits for individual columns
-#' @param row.names a logical value indicating whether to include row names; by
-#'   default, row names are included if \code{rownames(x)} is neither
-#'   \code{NULL} nor identical to \code{1:nrow(x)}
-#' @param col.names a character vector of column names to be used in the table
-#' @param align the alignment of columns: a character vector consisting of
-#'   \code{'l'} (left), \code{'c'} (center) and/or \code{'r'} (right); by
-#'   default, numeric columns are right-aligned, and other columns are
-#'   left-aligned; if \code{align = NULL}, the default alignment is used
-#' @param caption the table caption
-#' @param format.args a list of arguments to be passed to \code{\link{format}()}
-#'   to format table values, e.g. \code{list(big.mark = ',')}
-#' @param escape escape special characters when producing HTML or LaTeX tables
-#' @param ... other arguments (see examples)
+#'   can also be set in the global option \code{knitr.table.format}. If
+#'   \code{format} is a function, it must return a character string.
+#' @param digits Maximum number of digits for numeric columns, passed to
+#'   \code{round()}. This can also be a vector of length \code{ncol(x)}, to set
+#'   the number of digits for individual columns.
+#' @param row.names Logical: whether to include row names. By default, row names
+#'   are included if \code{rownames(x)} is neither \code{NULL} nor identical to
+#'   \code{1:nrow(x)}.
+#' @param col.names A character vector of column names to be used in the table.
+#' @param align Column alignment: a character vector consisting of \code{'l'}
+#'   (left), \code{'c'} (center) and/or \code{'r'} (right). By default or if
+#'   \code{align = NULL}, numeric columns are right-aligned, and other columns
+#'   are left-aligned. If \code{length(align) == 1L}, the string will be
+#'   expanded to a vector of individual letters, e.g. \code{'clc'} becomes
+#'   \code{c('c', 'l', 'c')}, unless the output format is LaTeX.
+#' @param caption The table caption.
+#' @param label The table reference label. By default, the label is obtained
+#'   from \code{knitr::\link{opts_current}$get('label')}.
+#' @param format.args A list of arguments to be passed to \code{\link{format}()}
+#'   to format table values, e.g. \code{list(big.mark = ',')}.
+#' @param escape Boolean; whether to escape special characters when producing
+#'   HTML or LaTeX tables.
+#' @param ... Other arguments (see Examples).
 #' @return A character vector of the table source code.
-#' @seealso Other R packages such as \pkg{xtable} and \pkg{tables} for HTML and
-#'   LaTeX tables, and \pkg{ascii} and \pkg{pander} for different flavors of
-#'   markdown output and some advanced features and table styles.
+#' @seealso Other R packages such as \pkg{huxtable}, \pkg{xtable},
+#'   \pkg{kableExtra}, and \pkg{tables} for HTML and LaTeX tables, and
+#'   \pkg{ascii} and \pkg{pander} for different flavors of markdown output and
+#'   some advanced features and table styles.
 #' @note The tables for \code{format = 'markdown'} also work for Pandoc when the
 #'   \code{pipe_tables} extension is enabled (this is the default behavior for
 #'   Pandoc >= 1.10).
@@ -48,6 +59,8 @@
 #' kable(mtcars, format = 'latex', booktabs = TRUE)
 #' # use the longtable package
 #' kable(matrix(1000, ncol=5), format = 'latex', digits = 2, longtable = TRUE)
+#' # change LaTeX default table environment
+#' kable(head(iris), format = "latex", caption = "My table", table.envir='table*')
 #' # add some table attributes
 #' kable(head(iris), format = 'html', table.attr = 'id="mytable"')
 #' # reST output
@@ -71,7 +84,7 @@
 #' # can also set options(knitr.table.format = 'html') so that the output is HTML
 kable = function(
   x, format, digits = getOption('digits'), row.names = NA, col.names = NA,
-  align, caption = NULL, format.args = list(), escape = TRUE, ...
+  align, caption = NULL, label = NULL, format.args = list(), escape = TRUE, ...
 ) {
 
   # determine the table format
@@ -81,16 +94,21 @@ kable = function(
     latex = 'latex', listings = 'latex', sweave = 'latex',
     html = 'html', markdown = 'markdown', rst = 'rst',
     stop('table format not implemented yet!')
-  ) else if (isTRUE(opts_knit$get('bookdown.table.latex')) && is_latex_output()) {
+  ) else if (isTRUE(opts_knit$get('kable.force.latex')) && is_latex_output()) {
     # force LaTeX table because Pandoc's longtable may not work well with floats
     # http://tex.stackexchange.com/q/276699/9128
     'latex'
   } else 'pandoc'
   if (is.function(format)) format = format()
 
+  # expand align if applicable
+  if (format != 'latex' && !missing(align) && length(align) == 1L)
+    align = strsplit(align, '')[[1]]
+
   # create a label for bookdown if applicable
+  if (is.null(label)) label = opts_current$get('label')
   if (!is.null(caption) && !is.na(caption)) caption = paste0(
-    create_label('tab:', opts_current$get('label')), caption
+    create_label('tab:', label, latex = (format == 'latex')), caption
   )
   if (inherits(x, 'list')) {
     # if the output is for Pandoc and we want multiple tabular in one table, we
@@ -108,11 +126,14 @@ kable = function(
     } else if (format == 'html' || (format == 'pandoc' && is_html_output())) kable_html(
       matrix(paste0('\n\n', res, '\n\n'), 1), caption = caption, escape = FALSE,
       table.attr = 'class="kable_wrapper"'
-    ) else paste(res, collapse = '\n\n')
+    ) else {
+      res = paste(res, collapse = '\n\n')
+      if (format == 'pandoc') kable_pandoc_caption(res, caption) else res
+    }
     return(structure(res, format = format, class = 'knitr_kable'))
   }
-  if (identical(col.names, NA)) col.names = colnames(x)
   if (!is.matrix(x)) x = as.data.frame(x)
+  if (identical(col.names, NA)) col.names = colnames(x)
   m = ncol(x)
   # numeric columns
   isn = if (is.matrix(x)) rep(is.numeric(x), m) else sapply(x, is.numeric)
@@ -137,9 +158,9 @@ kable = function(
     if (!is.null(align)) align = c('l', align)  # left align row names
   }
   n = nrow(x)
-  x = base::format(as.matrix(x), trim = TRUE, justify = 'none')
+  x = replace_na(to_character(as.matrix(x)), is.na(x))
   if (!is.matrix(x)) x = matrix(x, nrow = n)
-  x = gsub('^\\s*|\\s*$', '', x)
+  x = trimws(x)
   colnames(x) = col.names
   if (format != 'latex' && length(align) && !all(align %in% c('l', 'r', 'c')))
     stop("'align' must be a character vector of possible values 'l', 'r', and 'c'")
@@ -149,6 +170,13 @@ kable = function(
     list(x = x, caption = caption, escape = escape, ...)
   )
   structure(res, format = format, class = 'knitr_kable')
+}
+
+# convert to character while preserving dim/dimnames attributes
+to_character = function(x) {
+  if (is.character(x)) return(x)
+  x2 = as.character(x); dim(x2) = dim(x); dimnames(x2) = dimnames(x)
+  x2
 }
 
 # as.data.frame() does not allow duplicate row names (#898)
@@ -163,7 +191,13 @@ format_matrix = function(x, args) {
 format_args = function(x, args = list()) {
   args$x = x
   args$trim = TRUE
-  do.call(format, args)
+  replace_na(do.call(format, args), is.na(x))
+}
+
+replace_na = function(x, which = is.na(x), to = getOption('knitr.kable.NA')) {
+  if (is.null(to)) return(x)
+  x[which] = to
+  x
 }
 
 has_rownames = function(x) {
@@ -191,9 +225,10 @@ kable_latex = function(
   bottomrule = getOption('knitr.table.bottomrule', if (booktabs) '\\bottomrule' else '\\hline'),
   midrule = getOption('knitr.table.midrule', if (booktabs) '\\midrule' else '\\hline'),
   linesep = if (booktabs) c('', '', '', '', '\\addlinespace') else '\\hline',
-  caption = NULL, table.envir = if (!is.null(caption)) 'table', escape = TRUE
+  caption = NULL, caption.short = '', table.envir = if (!is.null(caption)) 'table',
+  escape = TRUE
 ) {
-  if (!is.null(align <- attr(x, 'align', exact = TRUE))) {
+  if (!is.null(align <- attr(x, 'align'))) {
     align = paste(align, collapse = vline)
     align = paste0('{', align, '}')
   }
@@ -204,14 +239,15 @@ kable_latex = function(
     sprintf('[%s]', valign)
   } else ''
   if (identical(caption, NA)) caption = NULL
-  env1 = sprintf('\\begin{%s}\n', table.envir)
+  env1 = sprintf('\\begin{%s}%s\n', table.envir, valign)
   env2 = sprintf('\n\\end{%s}',   table.envir)
-  cap = if (is.null(caption)) '' else sprintf('\n\\caption{%s}', caption)
+  if (caption.short != '') caption.short = paste0('[', caption.short, ']')
+  cap = if (is.null(caption)) '' else sprintf('\n\\caption%s{%s}', caption.short, caption)
 
   if (nrow(x) == 0) midrule = ""
 
   linesep = if (nrow(x) > 1) {
-    c(rep(linesep, length.out = nrow(x) - 2), linesep[[1L]], '')
+    c(rep(linesep, length.out = nrow(x) - 1), '')
   } else rep('', nrow(x))
   linesep = ifelse(linesep == "", linesep, paste0('\n', linesep))
 
@@ -222,7 +258,7 @@ kable_latex = function(
 
   paste(c(
     if (!longtable) c(env1, cap, centering),
-    sprintf('\n\\begin{%s}%s', tabular, valign), align,
+    sprintf('\n\\begin{%s}', tabular), align,
     if (longtable && cap != '') c(cap, '\\\\'),
     sprintf('\n%s', toprule), '\n',
     if (!is.null(cn <- colnames(x))) {
@@ -244,10 +280,10 @@ kable_latex_caption = function(x, caption) {
 }
 
 kable_html = function(x, table.attr = '', caption = NULL, escape = TRUE, ...) {
-  table.attr = gsub('^\\s+|\\s+$', '', table.attr)
+  table.attr = trimws(table.attr)
   # need a space between <table and attributes
   if (nzchar(table.attr)) table.attr = paste('', table.attr)
-  align = if (is.null(align <- attr(x, 'align', exact = TRUE))) '' else {
+  align = if (is.null(align <- attr(x, 'align'))) '' else {
     sprintf(' style="text-align:%s;"', c(l = 'left', c = 'center', r = 'right')[align])
   }
   if (identical(caption, NA)) caption = NULL
@@ -273,14 +309,13 @@ kable_html = function(x, table.attr = '', caption = NULL, escape = TRUE, ...) {
 #' Generate tables for Markdown and reST
 #'
 #' This function provides the basis for Markdown and reST tables.
-#' @param x the data matrix
-#' @param sep.row a chracter vector of length 3 that specifies the separators
-#'   before the header, after the header and at the end of the table,
-#'   respectively
-#' @param sep.col the column separator
-#' @param padding the number of spaces for the table cell padding
-#' @param align.fun a function to process the separator under the header
-#'   according to alignment
+#' @param x The data matrix.
+#' @param sep.row A length-3 character vector, specifying separators to be printed
+#'   before the header, after the header, and at the end of the table respectively.
+#' @param sep.col The column separator.
+#' @param padding Number of spaces for the table cell padding.
+#' @param align.fun A function to process the separator under the header
+#'   according to the alignment.
 #' @return A character vector of the table content.
 #' @noRd
 kable_mark = function(x, sep.row = c('=', '=', '='), sep.col = '  ', padding = 0,
@@ -297,7 +332,7 @@ kable_mark = function(x, sep.row = c('=', '=', '='), sep.col = '  ', padding = 0
     if (grepl('^\\s*$', cn[1L])) cn[1L] = rownames.name  # no empty cells for reST
     l = pmax(if (length(l) == 0) 0 else l, nchar(cn, type = 'width'))
   }
-  align = attr(x, 'align', exact = TRUE)
+  align = attr(x, 'align')
   padding = padding * if (length(align) == 0) 2 else {
     ifelse(align == 'c', 2, 1)
   }
@@ -314,7 +349,10 @@ kable_rst = function(x, rownames.name = '\\', ...) {
 
 # actually R Markdown
 kable_markdown = function(x, padding = 1, ...) {
-  if (is.null(colnames(x))) stop('the table must have a header (column names)')
+  if (is.null(colnames(x))) {
+    warning('The table should have a header (column names)')
+    colnames(x) = rep('', ncol(x))
+  }
   res = kable_mark(x, c(NA, '-', NA), '|', padding, align.fun = function(s, a) {
     if (is.null(a)) return(s)
     r = c(l = '^.', c = '^.|.$', r = '.$')
@@ -327,10 +365,18 @@ kable_markdown = function(x, padding = 1, ...) {
 }
 
 kable_pandoc = function(x, caption = NULL, padding = 1, ...) {
-  tab = kable_mark(x, c(NA, '-', if (is.null(colnames(x))) '-' else NA),
-                   padding = padding, ...)
+  tab = if (ncol(x) == 1) kable_markdown(
+    x, padding = padding, ...
+  ) else kable_mark(
+    x, c(NA, '-', if (is_blank(colnames(x))) '-' else NA),
+    padding = padding, ...
+  )
+  kable_pandoc_caption(tab, caption)
+}
+
+kable_pandoc_caption = function(x, caption) {
   if (identical(caption, NA)) caption = NULL
-  if (length(caption)) c(paste('Table:', caption), "", tab) else tab
+  if (length(caption)) c(paste('Table:', caption), "", x) else x
 }
 
 # pad a matrix

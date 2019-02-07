@@ -6,11 +6,12 @@
 #' however is also used by the knitr \code{\link{purl}} function to include
 #' the default parameter values in the R code it emits.
 #'
-#' @param text Character vector containing the document text
-#' @param evaluate If TRUE, expression values embedded within the YAML will be
-#' evaluated. This is the default. When FALSE, parameters defined by an
-#' expression will have the parsed expression in its \code{value} field.
-#' 
+#' @param text Character vector containing the document text.
+#' @param evaluate Boolean. If \code{TRUE} (the default), expression values embedded
+#' within the YAML will be evaluated. If \code{FALSE}, parameters defined with an
+#' expression will have the parsed but unevaluated expression in their \code{value}
+#' field.
+#'
 #' @return List of objects of class \code{knit_param} that correspond to the
 #'   parameters declared in the \code{params} section of the YAML front matter.
 #'   These objects have the following fields:
@@ -79,8 +80,7 @@ knit_params = function(text, evaluate = TRUE) {
   yaml = yaml_front_matter(text)
   if (is.null(yaml)) return(list())
 
-  yaml = enc2utf8(yaml)
-  knit_params_yaml(yaml, evaluate = evaluate)
+  knit_params_yaml(enc2utf8(yaml), evaluate = evaluate)
 }
 
 #' Extract knit parameters from YAML text
@@ -88,25 +88,28 @@ knit_params = function(text, evaluate = TRUE) {
 #' This function reads the YAML front-matter that has already been extracted
 #' from a document and returns a list of any parameters declared there.
 #'
-#' @param yaml Character vector containing the YAML text
-#' @param evaluate If TRUE, expression values embedded within the YAML will be
-#' evaluated. This is the default. When FALSE, parameters defined by an
-#' expression will have the parsed expression in its \code{value} field.
+#' @param yaml Character vector containing the YAML text.
+#' @param evaluate If \code{TRUE} (the default) expression values
+#' embedded within the YAML will be evaluated. If \code{FALSE}, parameters
+#' defined with an expression will have the parsed but unevaluated expression
+#' in their \code{value} field.
 #'
 #' @return List of objects of class \code{knit_param} that correspond to the
 #' parameters declared in the \code{params} section of the YAML. See
 #' \code{\link{knit_params}} for a full description of these objects.
 #'
 #' @seealso \code{\link{knit_params}}
-#' 
+#'
 #' @export
 knit_params_yaml = function(yaml, evaluate = TRUE) {
   # parse the yaml using our handlers
-  parsed_yaml = yaml::yaml.load(yaml, handlers = knit_params_handlers(evaluate = evaluate))
+  parsed_yaml = yaml::yaml.load(
+    yaml, handlers = knit_params_handlers(evaluate = evaluate), eval.expr = TRUE
+  )
 
   # if we found paramters then resolve and return them
   if (is.list(parsed_yaml) && !is.null(parsed_yaml$params)) {
-    resolve_params(mark_utf8(parsed_yaml$params), evaluate = evaluate)
+    resolve_params(parsed_yaml$params, evaluate = evaluate)
   } else {
     list()
   }
@@ -116,19 +119,6 @@ knit_params_yaml = function(yaml, evaluate = TRUE) {
 flatten_params = function(params) {
   res = list()
   for (param in params) res[[param$name]] = param$value
-  res
-}
-
-# copied from rmarkdown:::mark_utf8
-mark_utf8 = function(x) {
-  if (is.character(x)) {
-    Encoding(x) = 'UTF-8'
-    return(x)
-  }
-  if (!is.list(x)) return(x)
-  attrs = attributes(x)
-  res = lapply(x, mark_utf8)
-  attributes(res) = attrs
   res
 }
 
@@ -161,14 +151,12 @@ yaml_front_matter = function(lines) {
 
   front_matter = front_matter_lines
   front_matter = front_matter[2:(length(front_matter) - 1)]
-  # FIXME: this is only for apex on CRAN (https://github.com/thibautjombart/apex/pull/15)
-  if (length(grep('^params:', front_matter)) == 0) return()
+  if (length(grep('^params:', front_matter)) == 0) return()  # no params in YAML
   front_matter = paste(front_matter, collapse = "\n")
 
   # ensure that the front-matter doesn't terminate with ':', so it won't cause a
   # crash when passed to yaml::load
   if (!grepl(":\\s*$", front_matter)) front_matter
-
 }
 
 
@@ -229,17 +217,14 @@ resolve_params = function(params, evaluate = TRUE) {
   resolved_params = list()
 
   # iterate over names
-  names = names(params)
-  for (name in names) {
+  for (name in names(params)) {
 
     # get the parameter
     param = params[[name]]
 
     if (inherits(param, "knit_param_expr")) {
       # We have a key: !r expr
-      param = list(
-          expr = param$expr,
-          value = param$value)
+      param = list(expr = param$expr, value = param$value)
     } else if (is.list(param)) {
       if ("value" %in% names(param)) {
         # This looks like a complex parameter configuration.
@@ -250,14 +235,13 @@ resolve_params = function(params, evaluate = TRUE) {
           param$value = value$value
         }
       } else {
-        stop("no value field specified for YAML parameter '", name, "'",
-             call. = FALSE)
+        stop2("no value field specified for YAML parameter '", name, "'")
       }
     } else {
       # A simple key: value
       param = list(value = param)
     }
-      
+
     # param is now always a named list. record name and add knit_param class.
     param$name = name
     param = structure(param, class = "knit_param")

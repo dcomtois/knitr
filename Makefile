@@ -6,6 +6,7 @@ PKGSRC  := $(shell basename `pwd`)
 all: check clean
 
 deps:
+	tlmgr install pgf preview xcolor;\
 	Rscript -e 'if (!require("Rd2roxygen")) install.packages("Rd2roxygen", repos="http://cran.rstudio.com")'
 
 docs:
@@ -37,14 +38,13 @@ integration-need:
 		git checkout ${TRAVIS_BRANCH} && \
 		GIT_PAGER=cat git show HEAD
 
-integration-run: install
-	rm knitr-examples/cache -rf
+integration-run:
 	make deps xvfb-start knit xvfb-stop -C knitr-examples
 
 integration-verify:
 	GIT_PAGER=cat make diff -C knitr-examples
 
-integration: integration-run integration-verify
+integration: install integration-run integration-verify
 
 examples:
 	cd inst/examples;\
@@ -55,18 +55,6 @@ vignettes:
 	lyx -e knitr knitr-refcard.lyx;\
 	sed -i '/\\usepackage{breakurl}/ d' knitr-refcard.Rnw;\
 	mv knitr-refcard.Rnw assets/template-refcard.tex
-
-# the svn mirror created by
-# svn checkout svn+ssh://yihui@svn.r-forge.r-project.org/svnroot/isu/pkg/knitr knitr-rforge
-svn:
-	git archive master > ../knitr.tar;\
-	cd ../knitr-rforge && rm -r `ls` && tar -xf ../knitr.tar;\
-	svn add --force . && svn commit -m 'sync with git'
-
-downstream:
-	Rscript -e "source('http://developer.r-project.org/CRAN/Scripts/depends.R');" \
-	-e "x = reverse_dependencies_with_maintainers('knitr', c('Depends', 'Imports', 'LinkingTo', 'Suggests'))" \
-	-e "cat('\n'); cat(unique(x[, 'Maintainer']), sep = ', \n'); cat('\n')"
 
 clean:
 	cd ..;\

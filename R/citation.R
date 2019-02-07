@@ -17,16 +17,18 @@
 #' often, so it is not a lot of work even if you just cut and paste such
 #' bibliography entries from \code{toBibtex(citation())}.
 #'
-#' @param x package names (packages which are not installed are ignored)
-#' @param file the (\file{.bib}) file to write (by default writes to the R
-#'   console; ignored if it is \code{NULL})
-#' @param tweak whether to fix some known problems in the citations, especially
-#'   non-standard format of authors
-#' @param prefix a prefix string for keys in BibTeX entries; by default, it is
+#' @param x Package names. Packages which are not installed are ignored.
+#' @param file The (\file{.bib}) file to write. By default, or if \code{NULL},
+#'   output is written to the R console.
+#' @param tweak Whether to fix some known problems in the citations, especially
+#'   non-standard format of author names.
+#' @param width Width of lines in bibliography entries. If \code{NULL},
+#'   lines will not be wrapped.
+#' @param prefix Prefix string for keys in BibTeX entries; by default, it is
 #'   \samp{R-} unless \code{\link{option}('knitr.bib.prefix')} has been set to
-#'   another string
-#' @return a list containing the citations (also written to the \code{file} as a
-#'   side effect)
+#'   another string.
+#' @return A list containing the citations. Citations are also written to the \code{file} as a
+#'   side effect.
 #' @note Some packages on CRAN do not have standard bib entries, which was once
 #'   reported by Michael Friendly at
 #'   \url{https://stat.ethz.ch/pipermail/r-devel/2010-November/058977.html}. I
@@ -55,8 +57,10 @@
 #'
 #' # what tweak=TRUE does
 #' str(knitr:::.tweak.bib)
-write_bib = function(x = .packages(), file = '', tweak = TRUE,
-                     prefix = getOption('knitr.bib.prefix', 'R-')) {
+write_bib = function(
+  x = .packages(), file = '', tweak = TRUE, width = NULL,
+  prefix = getOption('knitr.bib.prefix', 'R-')
+) {
   idx = mapply(system.file, package = x) == ''
   if (any(idx)) {
     warning('package(s) ', paste(x[idx], collapse = ', '), ' not found')
@@ -82,13 +86,15 @@ write_bib = function(x = .packages(), file = '', tweak = TRUE,
     }
     bib = lapply(bib, function(b) {
       b['author'] = sub('Duncan Temple Lang', 'Duncan {Temple Lang}', b['author'])
+      b['title'] = sub("'RStudio'", 'RStudio', b['title'])
       if (!('year' %in% names(b))) b['year'] = .this.year
       idx = which(names(b) == '')
+      if (!is.null(width)) b[-idx] = stringr::str_wrap(b[-idx], width, 2, 4)
       structure(c(b[idx[1L]], b[-idx], b[idx[2L]]), class = 'Bibtex')
     })
   }
   bib = bib[sort(x)]
-  if (!is.null(file)) cat(unlist(bib), sep = '\n', file = file)
+  if (!is.null(file) && length(x)) xfun::write_utf8(unlist(bib), file)
   invisible(bib)
 }
 
@@ -99,8 +105,8 @@ write_bib = function(x = .packages(), file = '', tweak = TRUE,
 # hack non-standard author fields
 .tweak.bib = local({
   x = read.csv(inst_dir('misc/tweak_bib.csv'), stringsAsFactors = FALSE)
-  x = x[order(x$package), , drop = FALSE]  # reorder entries by package names
-  write.csv(x, inst_dir('misc/tweak_bib.csv'), row.names = FALSE)
+  x = x[order(xtfrm(x$package)), , drop = FALSE]  # reorder entries by package names
+  try_silent(write.csv(x, inst_dir('misc/tweak_bib.csv'), row.names = FALSE))
   setNames(
     lapply(x$author, function(a) c(author = sprintf('  author = {%s},', a))),
     x$package

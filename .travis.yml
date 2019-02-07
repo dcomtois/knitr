@@ -1,4 +1,4 @@
-language: c
+language: r
 
 sudo: false
 
@@ -7,26 +7,26 @@ env:
   matrix:
     - TARGET=travis
     - TARGET=integration DISPLAY=:99.0
-  global:
-    secure: AwMvWbAlUxA/SNmXpfm3zL7o5ohB2Qp/qyCrYdLRc8u9v6FBQAVq0NXghsN9NVCUiNO+unSr7qXj9JDcRyx6qj67nEzTM3Pcq1iEUAoWQyhDw9gyTls8wya2K4PG86b2yUAtVFkYBYDakjuTdo786Ili+Dsw4XP0PgtnuozCxuY=
 
 # capturing state, early exit if no integration test is needed
 before_install:
-  - export PATH=$HOME/bin:$HOME/texlive/bin/x86_64-linux:$PATH
+  - export PATH=$HOME/texlive/bin/x86_64-linux:$PATH
+  - export RGL_USE_NULL=TRUE
+  - tlmgr update --all --self
+  - tlmgr conf texmf TEXMFHOME $(Rscript -e "cat(file.path(R.home('share'), 'texmf'))")
   - if [ ${TARGET} = integration ]; then
       if ! make integration-need; then
         echo "NOTE:"" Integration test skipped. To enable, create a branch named ${TRAVIS_BRANCH} in ${TRAVIS_REPO_SLUG}-examples.";
         exit 0;
       fi;
     fi
+  - "curl https://xran.yihui.name/.gitconfig -o ~/.gitconfig"
+  - Rscript -e 'update.packages(.libPaths()[1], ask = FALSE)'
+  - Rscript -e "if (!require('covr')) install.packages('covr')"
 
 addons:
   apt:
-    sources:
-    - r-packages-precise
     packages:
-    - r-base-dev
-    - r-recommended
     - ghc
     - highlight
     - optipng
@@ -36,31 +36,26 @@ addons:
     - scala
     - qpdf
     - texinfo
+    - cargo
 
-# install dependencies
-install:
-  - "[ ! -d ~/bin ] && mkdir ~/bin || true"
-  - "wget -q -O - https://github.com/yihui/crandalf/raw/master/inst/scripts/install-texlive | bash"
-  - "wget -q -O - https://github.com/yihui/crandalf/raw/master/inst/scripts/install-pandoc | bash"
-  - "wget -q -O - http://yihui.name/xran/r-config | bash"
-  - Rscript -e "if (!require('devtools')) install.packages('devtools')"
-  - Rscript -e 'devtools::install_deps(dep = TRUE); update.packages(.libPaths()[1], ask = FALSE)'
-  - Rscript -e "if (!require('covr')) install.packages('covr')"
+repos:
+  XRAN: https://xran.yihui.name
 
 cache:
+  packages: yes
   directories:
-  - $HOME/R
-  - $HOME/texlive
-  - $HOME/bin
+    - $HOME/texlive
+
+before_script:
+  - Rscript -e "if (!require('webshot')) devtools::install_github('wch/webshot')"
 
 # run tests
 script:
+  - rm knitr-examples/cache -rf
   - make ${TARGET}
 
 # deploy to xran after integration tests
 after_success:
+  - "[ $TARGET = travis ] && Rscript -e 'covr::codecov()' || true"
   - export R_PKG="$(basename $TRAVIS_REPO_SLUG)"
-  - "[ $TARGET = integration ] && (wget -q -O - http://yihui.name/xran/r-xran | bash)"
-
-  # run test coverage only for the travis build
-  - "[ $TARGET = travis ] && Rscript -e 'covr::coveralls()'"
+  - "[ $TARGET = integration ] && (curl https://xran.yihui.name/r-xran | bash)"

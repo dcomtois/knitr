@@ -15,6 +15,10 @@ new_cache = function() {
   }
 
   cache_save = function(keys, outname, hash, lazy = TRUE) {
+    meta_name = cache_meta_name(hash)
+    if (exists(meta_name, envir = knit_global())) outname = c(outname, meta_name)
+    out0 = outname
+    on.exit(rm(list = out0, envir = knit_global()), add = TRUE)
     # keys are new variables created; outname is the text output of a chunk
     path = cache_path(hash)
     # add random seed to cache if exists
@@ -44,10 +48,9 @@ new_cache = function() {
     } else lines = x
     writeLines(lines, con = path)
   }
-  cache_objects = function(keys, code, label, path) {
+  cache_objects = function(keys, globals, label, path) {
     save_objects(keys, label, valid_path(path, '__objects'))
-    # find globals in code; may not be reliable
-    save_objects(find_globals(code), label, valid_path(path, '__globals'))
+    save_objects(globals, label, valid_path(path, '__globals'))
   }
 
   cache_load = function(hash, lazy = TRUE) {
@@ -59,6 +62,13 @@ new_cache = function() {
       load(path2, envir = knit_global())
       if (exists('.Random.seed', envir = knit_global(), inherits = FALSE))
         copy_env(knit_global(), globalenv(), '.Random.seed')
+      name = cache_meta_name(hash)
+      if (exists(name, envir = knit_global())) {
+        .knitEnv$meta = c(
+          .knitEnv$meta, get(name, envir = knit_global(), inherits = FALSE)
+        )
+        rm(list = name, envir = knit_global())
+      }
     }
   }
 
@@ -86,7 +96,11 @@ new_cache = function() {
   # when cache=3, code output is stored in .[hash], so cache=TRUE won't lose
   # output as cacheSweave does; for cache=1,2, output is the evaluate() list
   cache_output = function(hash, mode = 'character') {
-    get(sprintf('.%s', hash), envir = knit_global(), mode = mode, inherits = FALSE)
+    name = cache_output_name(hash)
+    res = get(name, envir = knit_global(), mode = mode, inherits = FALSE)
+    # clean up this hidden variable after we obtain its value
+    if (mode == mode(res)) rm(list = name, envir = knit_global())
+    res
   }
 
   list(purge = cache_purge, save = cache_save, load = cache_load, objects = cache_objects,
@@ -101,6 +115,19 @@ known_globals = c(
   '{', '[', '(', ':', '<-', '=', '+', '-', '*', '/', '%%', '%/%', '%*%', '%o%', '%in%'
 )
 
+# analyze code and find out all possible variables (not necessarily global variables)
+find_symbols = function(code) {
+  if (is.null(code) || length(p <- parse(text = code, keep.source = TRUE)) == 0) return()
+  p = getParseData(p)
+  p = p[p$terminal & p$token %in% c('SYMBOL', 'SYMBOL_FUNCTION_CALL', 'SPECIAL'), ]
+  unique(p$text)
+}
+
+# a variable name to store the metadata object from code chunks
+cache_meta_name = function(hash) sprintf('.%s_meta', hash)
+# a variable name to store the text output of code chunks
+cache_output_name = function(hash) sprintf('.%s', hash)
+
 cache = new_cache()
 
 # a regex for cache files
@@ -114,7 +141,7 @@ cache_rx = '_[abcdef0123456789]{32}[.](rdb|rdx|RData)$'
 #' object names in these files to automatically build cache dependencies, which
 #' is similar to the effect of the \code{dependson} option. It is supposed to be
 #' used in the first chunk of a document and this chunk must not be cached.
-#' @param path the path to the dependency file
+#' @param path Path to the dependency file.
 #' @return \code{NULL}. The dependencies are built as a side effect.
 #' @note Be cautious about \code{path}: because this function is used in a
 #'   chunk, the working directory when the chunk is evaluated is the directory
@@ -124,7 +151,7 @@ cache_rx = '_[abcdef0123456789]{32}[.](rdb|rdx|RData)$'
 #'   files \file{__objects} and \file{__globals}.
 #' @export
 #' @seealso \code{\link{dep_prev}}
-#' @references \url{http://yihui.name/knitr/demo/cache/}
+#' @references \url{https://yihui.name/knitr/demo/cache/}
 dep_auto = function(path = opts_chunk$get('cache.path')) {
   # this function should be evaluated in the original working directory
   owd = setwd(opts_knit$get('output.dir')); on.exit(setwd(owd))
@@ -169,15 +196,15 @@ parse_objects = function(path) {
 #' chunk, which is normally not possible because \pkg{knitr} compiles the
 #' document in a linear fashion, and objects created later cannot be used before
 #' they are created.
-#' @param label the chunk label of the code chunk that has a cache database
-#' @param object the name of the object to be fetched from the database (if
-#'   missing, \code{NULL} is returned)
-#' @param notfound a value to use when the \code{object} cannot be found
-#' @param path the path of the cache database (normally set in the global chunk
-#'   option \code{cache.path})
-#' @param lazy whether to \code{\link{lazyLoad}} the cache database (depending
+#' @param label The chunk label of the code chunk that has a cache database.
+#' @param object The name of the object to be fetched from the database. If it is
+#'   missing, \code{NULL} is returned).
+#' @param notfound A value to use when the \code{object} cannot be found.
+#' @param path Path of the cache database (normally set in the global chunk
+#'   option \code{cache.path}).
+#' @param lazy Whether to \code{\link{lazyLoad}} the cache database (depending
 #'   on the chunk option \code{cache.lazy = TRUE} or \code{FALSE} of that code
-#'   chunk)
+#'   chunk).
 #' @note Apparently this function loads the value of the object from the
 #'   \emph{previous} run of the document, which may be problematic when the
 #'   value of the object becomes different the next time the document is
@@ -223,7 +250,7 @@ load_cache = function(
 #'   effect.
 #' @export
 #' @seealso \code{\link{dep_auto}}
-#' @references \url{http://yihui.name/knitr/demo/cache/}
+#' @references \url{https://yihui.name/knitr/demo/cache/}
 dep_prev = function() {
   labs = names(knit_code$get())
   if ((n <- length(labs)) < 2L) return() # one chunk or less; no sense of deps
@@ -243,7 +270,7 @@ dep_prev = function() {
 #' references.
 #' @export
 #' @format NULL
-#' @references \url{http://yihui.name/knitr/demo/cache/}
+#' @references \url{https://yihui.name/knitr/demo/cache/}
 #' @examples eval(rand_seed)
 #' rnorm(1) # .Random.seed is created (or modified)
 #' eval(rand_seed)
@@ -257,15 +284,25 @@ rand_seed = quote({
 #' will not be automatically cleaned. You can use this function to identify
 #' these possible files, and clean them if you are sure they are no longer
 #' needed.
-#' @param clean whether to remove the files
-#' @param path the cache path
+#' @param clean Boolean; whether to remove the files.
+#' @param path Path to the cache.
 #' @note  The identification is not guaranteed to be correct, especially when
 #'   multiple documents share the same cache directory. You are recommended to
 #'   call \code{clean_cache(FALSE)} and carefully check the list of files (if
 #'   any) before you really delete them (\code{clean_cache(TRUE)}).
+#'
+#'   This function must be called within a code chunk in a source document,
+#'   since it needs to know all chunk labels of the current document to
+#'   determine which labels are no longer present, and delete cache
+#'   corresponding to these labels.
 #' @export
 clean_cache = function(clean = FALSE, path = opts_chunk$get('cache.path')) {
-  owd = setwd(opts_knit$get('output.dir')); on.exit(setwd(owd))
+  odir = opts_knit$get('output.dir')
+  if (is.null(odir)) {
+    warning('This function must be called inside a source document')
+    return()
+  }
+  owd = setwd(odir); on.exit(setwd(owd))
   if (file_test('-d', path)) {
     p0 = path; p1 = ''
   } else {

@@ -1,7 +1,7 @@
 #' All built-in patterns
 #'
 #' This object is a named list of all built-in patterns.
-#' @references Usage: \url{http://yihui.name/knitr/patterns}
+#' @references Usage: \url{https://yihui.name/knitr/patterns/}
 #' @export
 #' @seealso \code{\link{knit_patterns}}
 #' @examples all_patterns$rnw; all_patterns$html
@@ -11,16 +11,16 @@ all_patterns = list(
   `rnw` = list(
     chunk.begin = '^\\s*<<(.*)>>=.*$', chunk.end = '^\\s*@\\s*(%+.*|)$',
     inline.code = '\\\\Sexpr\\{([^}]+)\\}', inline.comment = '^\\s*%.*',
-    ref.chunk = '^\\s*<<(.+)>>\\s*$', header.begin = '(^|\n)[^%]*\\s*\\\\documentclass[^}]+\\}',
+    ref.chunk = '^\\s*<<(.+)>>\\s*$', header.begin = '(^|\n)\\s*\\\\documentclass[^}]+\\}',
     document.begin = '\\s*\\\\begin\\{document\\}'),
 
   `brew` = list(inline.code = '<%[=]{0,1}\\s+([^%]+)\\s+[-]*%>'),
 
   `tex` = list(
     chunk.begin = '^\\s*%+\\s*begin.rcode\\s*(.*)', chunk.end = '^\\s*%+\\s*end.rcode',
-    chunk.code = '^%+', ref.chunk = '^%+\\s*<<(.+)>>\\s*$',
+    chunk.code = '^\\s*%+', ref.chunk = '^%+\\s*<<(.+)>>\\s*$',
     inline.comment = '^\\s*%.*', inline.code = '\\\\rinline\\{([^}]+)\\}',
-    header.begin = '(^|\n)[^%]*\\s*\\\\documentclass[^}]+\\}',
+    header.begin = '(^|\n)\\s*\\\\documentclass[^}]+\\}',
     document.begin = '\\s*\\\\begin\\{document\\}'),
 
   `html` = list(
@@ -29,13 +29,13 @@ all_patterns = list(
     inline.code = '<!--\\s*rinline(.+?)-->', header.begin = '\\s*<head>'),
 
   `md` = list(
-    chunk.begin = '^[\t >]*```+\\s*\\{[.]?([a-zA-Z]+.*)\\}\\s*$',
+    chunk.begin = '^[\t >]*```+\\s*\\{([a-zA-Z0-9_]+.*)\\}\\s*$',
     chunk.end = '^[\t >]*```+\\s*$',
-    ref.chunk = '^\\s*<<(.+)>>\\s*$', inline.code = '`r +([^`]+)\\s*`'),
+    ref.chunk = '^\\s*<<(.+)>>\\s*$', inline.code = '(?<!(^|\n)``)`r[ #]([^`]+)\\s*`'),
 
   `rst` = list(
     chunk.begin = '^\\s*[.][.]\\s+\\{r(.*)\\}\\s*$',
-    chunk.end = '^\\s*[.][.]\\s+[.][.]\\s*$', chunk.code = '^[.][.]',
+    chunk.end = '^\\s*[.][.]\\s+[.][.]\\s*$', chunk.code = '^\\s*[.][.]',
     ref.chunk = '^\\.*\\s*<<(.+)>>\\s*$', inline.code = ':r:`([^`]+)`'),
 
   `asciidoc` = list(
@@ -52,7 +52,7 @@ all_patterns = list(
     inline.comment = '^###[.].*')
 )
 
-.sep.label = '^#+\\s*(@knitr|----+)(.*?)-*\\s*$'  # pattern for code chunks in an R script
+.sep.label = '^(#|--)+\\s*(@knitr|----+)(.*?)-*\\s*$'  # pattern for code chunks in an R script
 
 # initial pattern list
 .pat.init = list(
@@ -70,9 +70,9 @@ all_patterns = list(
 #' \link{all_patterns}.
 #'
 #' @seealso \code{\link{all_patterns}}
-#' @references Usage: \url{http://yihui.name/knitr/objects}
+#' @references Usage: \url{https://yihui.name/knitr/objects/}
 #'
-#' Components in \code{knit_patterns}: \url{http://yihui.name/knitr/patterns}
+#' Components in \code{knit_patterns}: \url{https://yihui.name/knitr/patterns/}
 #' @export
 #' @examples library(knitr)
 #' opat = knit_patterns$get() # old pattern list (to restore later)
@@ -145,11 +145,12 @@ detect_pattern = function(text, ext) {
     if (ext %in% c('htm', 'html', 'rhtm', 'rhtml')) return('html')
     if (ext %in% c('rmd', 'rmarkdown', 'markdown', 'md')) return('md')
     if (ext %in% c('rst', 'rrst')) return('rst')
+    if (ext %in% c('asciidoc', 'rasciidoc', 'adoc', 'radoc')) return('asciidoc')
   }
   for (p in names(all_patterns)) {
     for (i in c('chunk.begin', 'inline.code')) {
       pat = all_patterns[[p]][[i]]
-      if (length(pat) && length(grep(pat, text))) return(p)
+      if (length(pat) && any(stringr::str_detect(text, pat))) return(p)
     }
   }
   # *.Rtex indicates the tex syntax in knitr, but Rnw syntax in traditional

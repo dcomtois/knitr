@@ -1,36 +1,6 @@
 You are welcome to file issues or, even better, contribute code to this repo. If
 you want to report an issue, please read [FAQ 1](https://bit.ly/knitr-faq) first.
 
-## Issues
-
-For bug reports, please provide a minimal reproducible example. By "minimal", I
-mean you should reduce your example as much as possible right before the problem
-you want to report disappears. By doing this, you may be able to figure out what
-the problem really is before reporting to me. Please do not make me read your
-hundreds of lines of code (most of which are perhaps irrelevant to the bug), or
-understand dozens of variables in your particular dataset (use a simple built-in
-dataset in R instead, such as `iris` or `mtcars`, or simulated data). Make your
-example self-contained in one single document, i.e. avoid reading external files
-if possible, which you may forget to attach to your bug report.
-
-To include a verbatim chunk of arbitrary text, indent it by four spaces,
-especially when it contains backticks, e.g.
-
-        A sample document.
-
-        ```{r}
-        1 + 1  # a line of code
-        ```
-
-        Another paragraph.
-
-If it is just a chunk of R code (or other languages) and you want syntax
-highlighting, you may use three backticks to format it, e.g.
-
-    ```r
-    rnorm(10)
-    ```
-
 ## Pull requests
 
 You may expedite bug fixes and new features by doing the work by yourself.
@@ -40,26 +10,10 @@ complicated changes, you will have to manually create a [pull
 request](https://help.github.com/articles/using-pull-requests) (PR) after
 [forking](https://help.github.com/articles/fork-a-repo) this repository. In the
 latter case, you are recommended to create a new branch instead of always
-working on the `master` branch, and please always rebase against my `master`
-branch (sometimes you will need to force push, i.e. `git push -f`, after
-rebasing):
+working on the `master` branch.
 
-```bash
-# suppose your-branch-name is your new branch name
-git pull --rebase https://github.com/yihui/knitr.git your-branch-name
-```
-
-If your PR contains commits that revert each other, or attempts that failed, you
-need to clean the GIT history (and force push). For example, you may combine all
-the last 5 commits into one:
-
-```bash
-git reset --soft HEAD~5
-# then git add/commit/push
-```
-
-Interactively rebasing a few commits is also very helpful in this case, which
-gives you granular control over the commits, e.g. `git rebase -i HEAD~5`.
+If you submit a non-trivial pull request (e.g. not just fixing a typo), you may
+add your name to the `Authors@R` field as a contributor (`ctb`) in the R package `DESCRIPTION` file.
 
 ## Testing
 
